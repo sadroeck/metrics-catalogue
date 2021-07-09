@@ -1,0 +1,8 @@
+[package]
+name = "metrics-catalogue"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+metrics-catalogue-macros = { path = "../macros", version = "0.1" }
+metrics = "0.16"
