@@ -79,7 +79,10 @@ impl MetricTree {
                         };
                         sub_metrics.insert(
                             orig.ident.as_ref().expect("No identity").clone(),
-                            field_type,
+                            SubMetric {
+                                ident: field_type,
+                                hidden: field.attributes.hidden,
+                            },
                         );
                     }
                 }
@@ -119,14 +122,21 @@ impl MetricTree {
         };
 
         let counters = match_metric_names(&scope.metrics, MetricType::Counter);
-        // TODO: Skip hidden sub metrics
-        let sub_counters = scope.sub_metrics.iter().map(|(k, _v)| {
-            quote! { .or_else(|| self.#k.find_counter(name))}
-        });
+        let sub_counters = scope
+            .sub_metrics
+            .iter()
+            .filter(|(_, m)| !m.hidden)
+            .map(|(k, _v)| {
+                quote! { .or_else(|| self.#k.find_counter(name))}
+            });
         let gauges = match_metric_names(&scope.metrics, MetricType::Gauge);
-        let sub_gauges = scope.sub_metrics.iter().map(|(k, _v)| {
-            quote! { .or_else(|| self.#k.find_gauge(name))}
-        });
+        let sub_gauges = scope
+            .sub_metrics
+            .iter()
+            .filter(|(_, m)| !m.hidden)
+            .map(|(k, _v)| {
+                quote! { .or_else(|| self.#k.find_gauge(name))}
+            });
 
         let registry_trait = quote! {
             impl Registry for #scope_name {
@@ -152,16 +162,21 @@ impl MetricTree {
             let kv = quote! { #key: &str = #name };
             quote! { pub const #kv; }
         });
-        let sub_metric_spaces = scope.sub_metrics.iter().map(|(k, v)| {
-            let internal_mod = format_ident!("catalogue_{}", v);
-            let public_mod = format_ident!("{}", k);
-            quote! {
-                pub mod #public_mod {
-                    #[allow(non_camel_case_types)]
-                    pub use super::super::#internal_mod::*;
-                }
-            }
-        });
+        let sub_metric_spaces =
+            scope
+                .sub_metrics
+                .iter()
+                .filter(|(_, m)| !m.hidden)
+                .map(|(k, v)| {
+                    let internal_mod = format_ident!("catalogue_{}", v.ident);
+                    let public_mod = format_ident!("{}", k);
+                    quote! {
+                        pub mod #public_mod {
+                            #[allow(non_camel_case_types)]
+                            pub use super::super::#internal_mod::*;
+                        }
+                    }
+                });
         let keys = metric_keys.chain(sub_metric_spaces);
         let name_mod = format_ident!("catalogue_{}", scope_name);
         let internal_catalogue = quote! {
@@ -260,10 +275,22 @@ fn default_init((k, v): (impl Borrow<Ident>, impl Borrow<Ident>)) -> proc_macro2
 }
 
 #[derive(Debug)]
+struct SubMetric {
+    ident: Ident,
+    hidden: bool,
+}
+
+impl Borrow<Ident> for &SubMetric {
+    fn borrow(&self) -> &Ident {
+        &self.ident
+    }
+}
+
+#[derive(Debug)]
 struct MetricScope {
     name: String,
     metrics: Vec<MetricInstance>,
-    sub_metrics: HashMap<Ident, Ident>,
+    sub_metrics: HashMap<Ident, SubMetric>,
     other_fields: HashMap<Ident, Ident>,
 }
 
