@@ -190,7 +190,7 @@ impl MetricTree {
         let public_catalogue = if scope_name == "Test" {
             quote! {
                 pub mod catalogue {
-                    pub use super::#name_mod;
+                    pub use super::#name_mod::*;
                 }
             }
         } else {
