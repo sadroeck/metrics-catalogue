@@ -12,6 +12,7 @@ use syn::{
 
 const HIDDEN_MARKER: &str = "hidden";
 const SKIP_MARKER: &str = "ignore";
+const DEFAULT_SEPARATOR: char = '.';
 
 lazy_static::lazy_static! {
     /// Hierarchical mapping of metric scopes
@@ -46,6 +47,39 @@ struct MetricTree {
     root_scope: Option<String>,
 }
 
+struct ScopedCatalogue {
+    mod_name: String,
+    metrics: Vec<(String, String)>,
+    sub_scopes: HashMap<String, ScopedCatalogue>,
+}
+
+impl ScopedCatalogue {
+    fn generate_prefix_keys(&self, prefix: &str) -> proc_macro2::TokenStream {
+        let metric_keys = self.metrics.iter().map(|(k, v)| {
+            let key = format_ident!("{}", k);
+            let name = format!("{}{}", prefix, v);
+            let kv = quote! { #key: &str = #name };
+            quote! { pub const #kv; }
+        });
+        let sub_metric_spaces = self.sub_scopes.iter().map(|(name, scope)| {
+            let prefix = format!("{}{}{}", prefix, name, DEFAULT_SEPARATOR);
+            scope.generate_prefix_keys(&prefix)
+        });
+        let keys = metric_keys.chain(sub_metric_spaces);
+        let name_mod = format_ident!("{}", self.mod_name);
+        quote! {
+            #[allow(non_camel_case_types)]
+            pub mod #name_mod {
+                #(#keys)*
+            }
+        }
+    }
+
+    fn generate_namespaced_keys(&self) -> proc_macro2::TokenStream {
+        self.generate_prefix_keys("")
+    }
+}
+
 impl MetricTree {
     fn is_complete(&self) -> bool {
         self.root_scope.is_some()
@@ -56,14 +90,7 @@ impl MetricTree {
     }
 
     fn generate_root(&self) -> proc_macro2::TokenStream {
-        let root_name = self.root_scope.clone().unwrap();
-        let root_catalogue = format_ident!("catalogue_{}", root_name);
-        let public_catalogue = quote! {
-            pub mod catalogue {
-                pub use super::#root_catalogue::*;
-            }
-        };
-
+        let root_name = self.root_scope.clone().expect("No root scope");
         let root_struct = format_ident!("{}", root_name);
         let recorder = quote! {
             impl Recorder for #root_struct {
@@ -95,20 +122,46 @@ impl MetricTree {
         };
 
         quote! {
-            #public_catalogue
-
             #recorder
         }
     }
 
     fn generate(&self) -> proc_macro2::TokenStream {
         let root = self.generate_root();
+        let catalogue = self.generate_catalogue();
         let scopes = self.scopes.values().map(MetricScope::generate);
-        let combined = std::iter::once(root).chain(scopes);
+        let combined = std::iter::once(root)
+            .chain(std::iter::once(catalogue))
+            .chain(scopes);
 
         quote! {
             #(#combined)*
         }
+    }
+
+    fn generate_scoped_catalogue(&self, mod_name: &str, scope_name: &str) -> ScopedCatalogue {
+        let scope = self.scopes.get(scope_name).expect("Invalid scope");
+        ScopedCatalogue {
+            mod_name: mod_name.to_string(),
+            metrics: scope
+                .metrics
+                .iter()
+                .filter(|m| !m.hidden)
+                .map(|m| (m.key.clone(), m.name.clone()))
+                .collect(),
+            sub_scopes: scope
+                .sub_metrics
+                .iter()
+                .filter(|(_, m)| !m.hidden)
+                .map(|(k, v)| (k.clone(), self.generate_scoped_catalogue(k, &v.ident)))
+                .collect(),
+        }
+    }
+
+    fn generate_catalogue(&self) -> proc_macro2::TokenStream {
+        let root_struct = self.root_scope.clone().expect("No root struct");
+        self.generate_scoped_catalogue("catalogue", &root_struct)
+            .generate_namespaced_keys()
     }
 
     fn parse_struct(&mut self, input: DeriveInput) -> Result<()> {
@@ -127,7 +180,7 @@ impl MetricTree {
                 &input,
                 format!(
                     "Duplicate root attribute previously detected on {}",
-                    self.root_scope.as_ref().unwrap()
+                    self.root_scope.as_ref().expect("No root scope")
                 ),
             ));
         }
@@ -269,14 +322,10 @@ impl MetricScope {
     fn generate(&self) -> proc_macro2::TokenStream {
         let initialize = self.generate_init();
         let registry_trait = self.generate_registry_trait();
-        let internal_catalogue = self.generate_internal_catalogue();
-
         quote! {
             #initialize
 
             #registry_trait
-
-            #internal_catalogue
         }
     }
 
@@ -311,7 +360,8 @@ impl MetricScope {
             .filter(|(_, m)| !m.hidden)
             .map(|(k, _v)| {
                 let sub = format_ident!("{}", k);
-                quote! { .or_else(|| self.#sub.find_counter(name))}
+                let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
+                quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| self.#sub.find_counter(n))) }
             });
         let gauges = match_metric_names(&self.metrics, MetricType::Gauge);
         let sub_gauges = self
@@ -320,7 +370,8 @@ impl MetricScope {
             .filter(|(_, m)| !m.hidden)
             .map(|(k, _v)| {
                 let sub = format_ident!("{}", k);
-                quote! { .or_else(|| self.#sub.find_gauge(name))}
+                let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
+                quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| self.#sub.find_gauge(n))) }
             });
 
         quote! {
@@ -338,37 +389,6 @@ impl MetricScope {
                     }
                     #(#sub_gauges)*
                 }
-            }
-        }
-    }
-
-    fn generate_internal_catalogue(&self) -> proc_macro2::TokenStream {
-        let metric_keys = self.metrics.iter().filter(|m| !m.hidden).map(|metric| {
-            let key = format_ident!("{}", metric.key);
-            let name = format_ident!("{}", metric.name).to_string();
-            let kv = quote! { #key: &str = #name };
-            quote! { pub const #kv; }
-        });
-        let sub_metric_spaces = self
-            .sub_metrics
-            .iter()
-            .filter(|(_, m)| !m.hidden)
-            .map(|(k, v)| {
-                let internal_mod = format_ident!("catalogue_{}", v.ident);
-                let public_mod = format_ident!("{}", k);
-                quote! {
-                    pub mod #public_mod {
-                        #[allow(non_camel_case_types)]
-                        pub use super::super::#internal_mod::*;
-                    }
-                }
-            });
-        let keys = metric_keys.chain(sub_metric_spaces);
-        let name_mod = format_ident!("catalogue_{}", self.struct_name);
-        quote! {
-            #[allow(non_camel_case_types)]
-            pub mod #name_mod {
-                #(#keys)*
             }
         }
     }
