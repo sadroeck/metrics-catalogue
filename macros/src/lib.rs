@@ -30,9 +30,7 @@ pub fn derive_metrics(input: TokenStream) -> TokenStream {
 fn generate(input: DeriveInput) -> Result<TokenStream> {
     let mut tree = METRIC_TREE.lock().unwrap();
     tree.parse_struct(input)?;
-    // eprintln!("{:#?}", tree);
     Ok(if tree.is_complete() {
-        // eprintln!("### COMPLETE - Generating..");
         tree.generate()
     } else {
         quote! {}
