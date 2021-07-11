@@ -25,12 +25,13 @@ mod tests {
 
         /// Hidden metrics
         #[metric(hidden)]
-        my_non_g: Counter,
+        _my_non_g: Counter,
         #[metric(hidden)]
-        my_hidden_sub: SubTest,
+        _my_hidden_sub: SubTest,
 
         /// Subtypes
         my_test: SubTest,
+        my_second_test: SubTest,
     }
 
     #[derive(Metrics)]
@@ -62,6 +63,16 @@ mod tests {
                 catalogue::my_test::my_sub_sub::MY_S_T_B,
                 "my_test.my_sub_sub.my_s_t_b",
             ),
+            (catalogue::my_second_test::MY_T_A, "my_second_test.my_t_a"),
+            (catalogue::my_second_test::MY_T_B, "my_second_test.my_t_b"),
+            (
+                catalogue::my_second_test::my_sub_sub::MY_S_T_A,
+                "my_second_test.my_sub_sub.my_s_t_a",
+            ),
+            (
+                catalogue::my_second_test::my_sub_sub::MY_S_T_B,
+                "my_second_test.my_sub_sub.my_s_t_b",
+            ),
         ];
         known_names.iter().for_each(|(k, v)| assert_eq!(k, v));
     }
@@ -76,6 +87,11 @@ mod tests {
             (
                 catalogue::my_test::my_sub_sub::MY_S_T_B,
                 &t.my_test.my_sub_sub.my_s_t_b,
+            ),
+            (catalogue::my_second_test::MY_T_B, &t.my_second_test.my_t_b),
+            (
+                catalogue::my_second_test::my_sub_sub::MY_S_T_B,
+                &t.my_second_test.my_sub_sub.my_s_t_b,
             ),
         ];
         for (key, field) in registered_counters {
@@ -94,11 +110,11 @@ mod tests {
     fn hidden_counters() {
         let t = Test::new();
         let hidden_counters = [
-            ("my_non_g", &t.my_non_g),
-            ("my_hidden_sub.my_b", &t.my_hidden_sub.my_t_b),
+            ("my_non_g", &t._my_non_g),
+            ("my_hidden_sub.my_b", &t._my_hidden_sub.my_t_b),
             (
                 "my_hidden_sub.my_sub_sub.my_s_t_b",
-                &t.my_hidden_sub.my_sub_sub.my_s_t_b,
+                &t._my_hidden_sub.my_sub_sub.my_s_t_b,
             ),
         ];
         for (key, field) in hidden_counters {
