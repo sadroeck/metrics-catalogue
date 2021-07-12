@@ -12,6 +12,7 @@ use syn::{
 
 const HIDDEN_MARKER: &str = "hidden";
 const SKIP_MARKER: &str = "ignore";
+const ROOT_MARKER: &str = "root";
 const DEFAULT_SEPARATOR: char = '.';
 
 lazy_static::lazy_static! {
@@ -171,9 +172,7 @@ impl MetricTree {
             )),
         }?;
 
-        // TODO: Detection via 'root' attribute
-        let is_root_scope = struct_data.ident == "Test";
-        if is_root_scope && self.root_scope.is_some() {
+        if struct_data.attributes.is_root && self.root_scope.is_some() {
             return Err(Error::new_spanned(
                 &input,
                 format!(
@@ -182,7 +181,9 @@ impl MetricTree {
                 ),
             ));
         }
-        self.root_scope.get_or_insert(struct_data.ident.to_string());
+        if struct_data.attributes.is_root {
+            self.root_scope.get_or_insert(struct_data.ident.to_string());
+        }
 
         let mut metrics = vec![];
         let mut other_fields = HashMap::new();
@@ -472,6 +473,7 @@ struct Struct<'a> {
     _original: &'a DeriveInput,
     pub ident: Ident,
     pub fields: Vec<Field<'a>>,
+    pub attributes: Attributes,
 }
 
 impl<'a> Struct<'a> {
@@ -480,6 +482,7 @@ impl<'a> Struct<'a> {
             _original: node,
             ident: node.ident.clone(),
             fields: Field::multiple_from_syn(&data.fields)?,
+            attributes: Attributes::from_node(&node.attrs),
         })
     }
 }
@@ -489,6 +492,7 @@ struct Attributes {
     pub hidden: bool,
     pub is_metric: bool,
     pub name_override: Option<String>,
+    pub is_root: bool,
 }
 
 impl Attributes {
@@ -511,6 +515,9 @@ impl Attributes {
                                             }
                                             if m.path().is_ident(SKIP_MARKER) {
                                                 attributes.is_metric = false;
+                                            }
+                                            if m.path().is_ident(ROOT_MARKER) {
+                                                attributes.is_root = true;
                                             }
                                         }
                                         NestedMeta::Lit(lit) => {

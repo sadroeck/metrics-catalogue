@@ -15,6 +15,7 @@ mod tests {
     use super::*;
 
     #[derive(Metrics)]
+    #[metric(root)]
     struct Test {
         my_b: Counter,
         my_g: Gauge,
