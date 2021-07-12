@@ -25,9 +25,9 @@ mod tests {
         my_a: Counter,
 
         /// Hidden metrics
-        #[metric(hidden)]
+        #[metric(skip)]
         _my_non_g: Counter,
-        #[metric(hidden)]
+        #[metric(skip)]
         _my_hidden_sub: SubTest,
 
         /// Subtypes

@@ -10,8 +10,7 @@ use syn::{
     NestedMeta, Result, Type,
 };
 
-const HIDDEN_MARKER: &str = "hidden";
-const SKIP_MARKER: &str = "ignore";
+const SKIP_MARKER: &str = "skip";
 const ROOT_MARKER: &str = "root";
 const DEFAULT_SEPARATOR: char = '.';
 
@@ -189,10 +188,16 @@ impl MetricTree {
         let mut other_fields = HashMap::new();
         let mut sub_metrics = HashMap::new();
         for field in &struct_data.fields {
-            if field.attributes.is_metric {
-                let name = field
-                    .get_metric()
-                    .ok_or_else(|| Error::new_spanned(&input, "No metric name"))?;
+            if !field.attributes.hidden {
+                let name = field.get_metric().ok_or_else(|| {
+                    Error::new_spanned(
+                        &input,
+                        format!(
+                            "No metric name for {}",
+                            field.original.ident.as_ref().expect("No field name")
+                        ),
+                    )
+                })?;
                 let path = if let Type::Path(path) = field.ty {
                     path
                 } else {
@@ -457,7 +462,7 @@ impl<'a> Field<'a> {
     }
 
     fn get_metric(&self) -> Option<String> {
-        if !self.attributes.is_metric {
+        if self.attributes.hidden {
             return None;
         }
 
@@ -490,17 +495,13 @@ impl<'a> Struct<'a> {
 #[derive(Default, Debug)]
 struct Attributes {
     pub hidden: bool,
-    pub is_metric: bool,
     pub name_override: Option<String>,
     pub is_root: bool,
 }
 
 impl Attributes {
     fn from_node(attrs: &[Attribute]) -> Self {
-        let mut attributes = Attributes {
-            is_metric: true,
-            ..Default::default()
-        };
+        let mut attributes = Attributes::default();
         for attr in attrs {
             if let Ok(meta) = attr.parse_meta() {
                 if let Some(ident) = meta.path().get_ident() {
@@ -510,11 +511,8 @@ impl Attributes {
                                 for nested in &list.nested {
                                     match nested {
                                         NestedMeta::Meta(m) => {
-                                            if m.path().is_ident(HIDDEN_MARKER) {
-                                                attributes.hidden = true;
-                                            }
                                             if m.path().is_ident(SKIP_MARKER) {
-                                                attributes.is_metric = false;
+                                                attributes.hidden = true;
                                             }
                                             if m.path().is_ident(ROOT_MARKER) {
                                                 attributes.is_root = true;
