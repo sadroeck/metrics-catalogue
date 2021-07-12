@@ -29,28 +29,40 @@ impl DiscreteGauge {
     pub const fn new() -> Self {
         Self(AtomicU64::new(0))
     }
+}
 
+pub trait GaugeMetric {
+    fn set(&self, val: f64);
+    /// Increases the value of the [`Gauge`] by a real amount
+    fn increase(&self, val: f64);
+    /// Decreases the value of the [`Gauge`] by a real amount
+    fn decrease(&self, val: f64);
+    /// Read the current state of the [`Gauge`]
+    fn read(&self) -> u64;
+}
+
+impl GaugeMetric for DiscreteGauge {
     /// Overwrite the value of the [`DiscreteGauge`] to a fixed discrete amount
     #[inline]
-    pub fn set(&self, val: f64) {
+    fn set(&self, val: f64) {
         self.0.store(val as u64, Ordering::Relaxed);
     }
 
     /// Increases the value of the [`DiscreteGauge`] by a discrete amount
     #[inline]
-    pub fn increase(&self, val: f64) {
+    fn increase(&self, val: f64) {
         self.0.fetch_add(val as u64, Ordering::Release);
     }
 
     /// Decreases the value of the [`DiscreteGauge`] by a discrete amount
     #[inline]
-    pub fn decrease(&self, val: f64) {
+    fn decrease(&self, val: f64) {
         self.0.fetch_sub(val as u64, Ordering::Release);
     }
 
     /// Read the current state of the [`DiscreteGauge`]
     #[inline]
-    pub fn read(&self) -> u64 {
+    fn read(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
 }
@@ -63,30 +75,6 @@ pub struct Gauge(AtomicU64);
 impl Gauge {
     pub const fn new() -> Self {
         Self(AtomicU64::new(0))
-    }
-
-    /// Overwrite the value of the [`Gauge`] to a fixed real amount
-    #[inline]
-    pub fn set(&self, val: f64) {
-        self.0.store(val.to_bits(), Ordering::Relaxed);
-    }
-
-    /// Increases the value of the [`Gauge`] by a real amount
-    #[inline]
-    pub fn increase(&self, val: f64) {
-        self.transform(|v| v + val);
-    }
-
-    /// Decreases the value of the [`Gauge`] by a real amount
-    #[inline]
-    pub fn decrease(&self, val: f64) {
-        self.transform(|v| v - val);
-    }
-
-    /// Read the current state of the [`Gauge`]
-    #[inline]
-    pub fn read(&self) -> u64 {
-        self.0.load(Ordering::Relaxed)
     }
 
     /// Apply a numerical transformation to the [`f64`] interpretation of the stored value.
@@ -106,5 +94,31 @@ impl Gauge {
                 return;
             }
         }
+    }
+}
+
+impl GaugeMetric for Gauge {
+    /// Overwrite the value of the [`Gauge`] to a fixed real amount
+    #[inline]
+    fn set(&self, val: f64) {
+        self.0.store(val.to_bits(), Ordering::Relaxed);
+    }
+
+    /// Increases the value of the [`Gauge`] by a real amount
+    #[inline]
+    fn increase(&self, val: f64) {
+        self.transform(|v| v + val);
+    }
+
+    /// Decreases the value of the [`Gauge`] by a real amount
+    #[inline]
+    fn decrease(&self, val: f64) {
+        self.transform(|v| v - val);
+    }
+
+    /// Read the current state of the [`Gauge`]
+    #[inline]
+    fn read(&self) -> u64 {
+        self.0.load(Ordering::Relaxed)
     }
 }

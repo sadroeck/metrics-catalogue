@@ -49,7 +49,7 @@ impl MetricScope {
 
     fn generate_registry_trait(&self) -> proc_macro2::TokenStream {
         let struct_name = format_ident!("{}", &self.struct_name);
-        let counters = match_metric_names(&self.metrics, MetricType::Counter);
+        let counters = match_metric_names(&self.metrics, &[MetricType::Counter], None);
         let sub_counters = self
             .sub_metrics
             .iter()
@@ -59,7 +59,11 @@ impl MetricScope {
                 let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
                 quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| self.#sub.find_counter(n))) }
             });
-        let gauges = match_metric_names(&self.metrics, MetricType::Gauge);
+        let gauges = match_metric_names(
+            &self.metrics,
+            &[MetricType::Gauge, MetricType::DiscreteGauge],
+            Some("GaugeMetric"),
+        );
         let sub_gauges = self
             .sub_metrics
             .iter()
@@ -79,7 +83,7 @@ impl MetricScope {
                     #(#sub_counters)*
                 }
 
-                fn find_gauge(&self, name: &str) -> Option<&Gauge> {
+                fn find_gauge(&self, name: &str) -> Option<&dyn GaugeMetric> {
                     match name {
                         #(#gauges),*
                     }
@@ -152,23 +156,29 @@ fn default_init((k, v): (impl AsRef<str>, impl AsRef<str>)) -> proc_macro2::Toke
     quote! { #k: #v::new() }
 }
 
-fn match_instance(metric: &MetricInstance) -> proc_macro2::TokenStream {
+fn match_instance(metric: &MetricInstance, as_trait: Option<&str>) -> proc_macro2::TokenStream {
     let name = format_ident!("{}", metric.name);
     let instance = format_ident!("{}", metric.instance);
     let quoted_name = name.to_string();
-    quote! { #quoted_name => Some(&self.#instance) }
+    if let Some(as_trait) = as_trait {
+        let as_trait = format_ident!("{}", as_trait);
+        quote! { #quoted_name => Some(&self.#instance as &dyn #as_trait) }
+    } else {
+        quote! { #quoted_name => Some(&self.#instance) }
+    }
 }
 
-fn match_metric_names(
-    instances: &[MetricInstance],
-    metric_type: MetricType,
-) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {
+fn match_metric_names<'a>(
+    instances: &'a [MetricInstance],
+    metric_types: &'a [MetricType],
+    as_trait: Option<&'a str>,
+) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
     let f_ident = format_ident!("{}", "_");
     let fallthrough = quote! { #f_ident => None };
     instances
         .iter()
         .filter(|m| !m.hidden)
-        .filter(move |m| m.metric_type == metric_type)
-        .map(match_instance)
+        .filter(move |m| metric_types.iter().any(|t| m.metric_type == *t))
+        .map(move |m| match_instance(m, as_trait))
         .chain(std::iter::once(fallthrough))
 }

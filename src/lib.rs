@@ -19,6 +19,7 @@ mod tests {
     struct Test {
         my_b: Counter,
         my_g: Gauge,
+        my_discrete_g: DiscreteGauge,
 
         // Name override
         #[metric("my_counter_a")]
