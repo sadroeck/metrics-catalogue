@@ -10,7 +10,7 @@ pub use metrics_catalogue_macros::Metrics;
 /// Export registry trait
 pub use registry::Registry;
 
-#[cfg(test)]
+// #[cfg(test)]
 mod tests {
     use super::*;
 
