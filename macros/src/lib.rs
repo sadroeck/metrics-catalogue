@@ -282,10 +282,10 @@ fn match_instance(metric: &MetricInstance) -> proc_macro2::TokenStream {
     quote! { #quoted_name => Some(&self.#instance) }
 }
 
-fn match_metric_names<'a>(
-    instances: &'a [MetricInstance],
+fn match_metric_names(
+    instances: &[MetricInstance],
     metric_type: MetricType,
-) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
+) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {
     let f_ident = format_ident!("{}", "_");
     let fallthrough = quote! { #f_ident => None };
     instances
