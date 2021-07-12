@@ -1,0 +1,211 @@
+use crate::ast::Struct;
+use crate::metric_scope::{MetricInstance, MetricScope, MetricType, SubMetric};
+use crate::scoped_catalogue::ScopedCatalogue;
+use quote::{format_ident, quote};
+use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
+use syn::{Data, DeriveInput, Error, Result, Type};
+
+#[derive(Default, Debug)]
+pub struct MetricTree {
+    scopes: HashMap<String, MetricScope>,
+    required_scopes: HashSet<String>,
+    root_scope: Option<String>,
+}
+
+impl MetricTree {
+    pub fn is_complete(&self) -> bool {
+        self.root_scope.is_some()
+            && self
+                .required_scopes
+                .iter()
+                .all(|name| self.scopes.contains_key(name))
+    }
+
+    fn generate_root(&self) -> proc_macro2::TokenStream {
+        let root_name = self.root_scope.clone().expect("No root scope");
+        let root_struct = format_ident!("{}", root_name);
+        let recorder = quote! {
+            impl Recorder for #root_struct {
+                // The following are unused in Stats
+                fn register_counter(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
+
+                fn register_gauge(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
+
+                fn register_histogram(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
+
+                fn record_histogram(&self, _key: &Key, _value: f64) {}
+
+                fn increment_counter(&self, key: &Key, value: u64) {
+                    if let Some(metric) = self.find_counter(key.name()) {
+                        metric.increment(value);
+                    }
+                }
+
+                fn update_gauge(&self, key: &Key, value: GaugeValue) {
+                    if let Some(metric) = self.find_gauge(key.name()) {
+                        match value {
+                            GaugeValue::Increment(val) => metric.increase(val),
+                            GaugeValue::Decrement(val) => metric.decrease(val),
+                            GaugeValue::Absolute(val) => metric.set(val),
+                        }
+                    }
+                }
+            }
+        };
+
+        quote! {
+            #recorder
+        }
+    }
+
+    pub fn generate(&self) -> proc_macro2::TokenStream {
+        let root = self.generate_root();
+        let catalogue = self.generate_catalogue();
+        let scopes = self.scopes.values().map(MetricScope::generate);
+        let combined = std::iter::once(root)
+            .chain(std::iter::once(catalogue))
+            .chain(scopes);
+
+        quote! {
+            #(#combined)*
+        }
+    }
+
+    fn generate_scoped_catalogue(&self, mod_name: &str, scope_name: &str) -> ScopedCatalogue {
+        let scope = self.scopes.get(scope_name).expect("Invalid scope");
+        ScopedCatalogue {
+            mod_name: mod_name.to_string(),
+            metrics: scope
+                .metrics
+                .iter()
+                .filter(|m| !m.hidden)
+                .map(|m| (m.key.clone(), m.name.clone()))
+                .collect(),
+            sub_scopes: scope
+                .sub_metrics
+                .iter()
+                .filter(|(_, m)| !m.hidden)
+                .map(|(k, v)| (k.clone(), self.generate_scoped_catalogue(k, &v.ident)))
+                .collect(),
+        }
+    }
+
+    fn generate_catalogue(&self) -> proc_macro2::TokenStream {
+        let root_struct = self.root_scope.clone().expect("No root struct");
+        self.generate_scoped_catalogue("catalogue", &root_struct)
+            .generate_namespaced_keys()
+    }
+
+    pub fn parse_struct(&mut self, input: DeriveInput) -> Result<()> {
+        let struct_data = match &input.data {
+            Data::Struct(data) => Struct::from_syn(&input, data),
+            Data::Enum(_) | Data::Union(_) => Err(Error::new_spanned(
+                &input,
+                "Metrics are only supported as structs",
+            )),
+        }?;
+
+        if struct_data.attributes.is_root && self.root_scope.is_some() {
+            return Err(Error::new_spanned(
+                &input,
+                format!(
+                    "Duplicate root attribute previously detected on {}",
+                    self.root_scope.as_ref().expect("No root scope")
+                ),
+            ));
+        }
+        if struct_data.attributes.is_root {
+            self.root_scope.get_or_insert(struct_data.ident.to_string());
+        }
+
+        let mut metrics = vec![];
+        let mut other_fields = HashMap::new();
+        let mut sub_metrics = HashMap::new();
+        for field in &struct_data.fields {
+            if !field.attributes.hidden {
+                let name = field.get_metric().ok_or_else(|| {
+                    Error::new_spanned(
+                        &input,
+                        format!(
+                            "No metric name for {}",
+                            field.original.ident.as_ref().expect("No field name")
+                        ),
+                    )
+                })?;
+                let path = if let Type::Path(path) = field.ty {
+                    path
+                } else {
+                    return Err(Error::new_spanned(&input, "Invalid type for metrics"));
+                };
+
+                let ident = path
+                    .path
+                    .get_ident()
+                    .ok_or_else(|| Error::new_spanned(&input, "Field needs to be a named type"))?;
+
+                match MetricType::try_from(ident) {
+                    Ok(metric_type) => metrics.push(MetricInstance {
+                        key: name.to_ascii_uppercase(),
+                        name: name.clone(),
+                        instance: field
+                            .original
+                            .ident
+                            .as_ref()
+                            .ok_or_else(|| Error::new_spanned(field.original, "No field identity"))?
+                            .to_string(),
+                        metric_type,
+                        hidden: field.attributes.hidden,
+                    }),
+                    Err(_err) => {
+                        // Should be a subtype
+                        let orig = field.original;
+                        let field_type = if let Type::Path(path) = &orig.ty {
+                            path.path
+                                .get_ident()
+                                .ok_or_else(|| Error::new_spanned(&input, "Not valid field type"))?
+                                .clone()
+                        } else {
+                            return Err(Error::new_spanned(&input, "Only structs are supported"));
+                        };
+                        sub_metrics.insert(
+                            orig.ident.as_ref().expect("No identity").to_string(),
+                            SubMetric {
+                                ident: field_type.to_string(),
+                                hidden: field.attributes.hidden,
+                            },
+                        );
+                    }
+                }
+            } else {
+                let orig = field.original;
+                let field_type = if let Type::Path(path) = &orig.ty {
+                    path.path
+                        .get_ident()
+                        .ok_or_else(|| Error::new_spanned(&input, "Not valid field type"))?
+                        .clone()
+                } else {
+                    return Err(Error::new_spanned(&input, "Only structs are supported"));
+                };
+                other_fields.insert(
+                    orig.ident.as_ref().expect("No identity").to_string(),
+                    field_type.to_string(),
+                );
+            }
+        }
+        let scope = MetricScope {
+            struct_name: struct_data.ident.to_string(),
+            metrics,
+            sub_metrics,
+            other_fields,
+        };
+
+        self.required_scopes.insert(scope.struct_name.clone());
+        self.required_scopes
+            .extend(scope.sub_metrics.iter().map(|(_, m)| &m.ident).cloned());
+
+        self.scopes.insert(struct_data.ident.to_string(), scope);
+
+        Ok(())
+    }
+}
