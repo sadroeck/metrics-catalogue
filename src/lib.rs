@@ -6,7 +6,7 @@ pub use crate::metrics::*;
 /// Re-export metrics crate
 pub use ::metrics::*;
 /// Re-export declarative macros
-pub use metrics_catalogue_macros::Metrics;
+pub use metrics_catalogue_macros::Catalogue;
 /// Export registry trait
 pub use registry::Registry;
 
@@ -14,7 +14,7 @@ pub use registry::Registry;
 mod tests {
     use super::*;
 
-    #[derive(Metrics)]
+    #[derive(Catalogue)]
     #[metric(root)]
     struct Test {
         my_b: Counter,
@@ -35,14 +35,14 @@ mod tests {
         my_second_test: SubTest,
     }
 
-    #[derive(Metrics)]
+    #[derive(Catalogue)]
     struct SubTest {
         my_t_a: Gauge,
         my_t_b: Counter,
         my_sub_sub: SubSubTest,
     }
 
-    #[derive(Metrics)]
+    #[derive(Catalogue)]
     struct SubSubTest {
         my_s_t_a: Gauge,
         my_s_t_b: Counter,

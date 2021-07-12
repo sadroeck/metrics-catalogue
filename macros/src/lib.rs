@@ -22,7 +22,7 @@ lazy_static::lazy_static! {
     };
 }
 
-#[proc_macro_derive(Metrics, attributes(metric))]
+#[proc_macro_derive(Catalogue, attributes(metric))]
 pub fn derive_metrics(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     generate(input).unwrap_or_else(|err| err.to_compile_error().into())
