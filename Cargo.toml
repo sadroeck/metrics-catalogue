@@ -8,6 +8,7 @@ description = "Metrics Catalogue"
 repository = "https://github.com/sadroeck/metrics-catalogue"
 documentation = "https://docs.rs/metrics-catalogue"
 categories = ["metrics"]
+keywords = ["metrics", "metric", "catalogue", "prometheus"]
 readme = "README.md"
 
 [workspace]
