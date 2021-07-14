@@ -1,7 +1,7 @@
 use crate::ast::Struct;
 use crate::metric_scope::{MetricInstance, MetricScope, MetricType, SubMetric};
 use crate::scoped_catalogue::ScopedCatalogue;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use syn::{Data, DeriveInput, Error, Result, Type};
@@ -140,15 +140,19 @@ impl MetricTree {
                     return Err(Error::new_spanned(&input, "Invalid type for metrics"));
                 };
 
-                let ident = path
+                let ident = &path
                     .path
-                    .get_ident()
-                    .ok_or_else(|| Error::new_spanned(&input, "Field needs to be a named type"))?;
+                    .segments
+                    .iter()
+                    .last()
+                    .ok_or_else(|| Error::new_spanned(&input, "Field needs to be a named type"))?
+                    .ident;
 
                 match MetricType::try_from(ident) {
                     Ok(metric_type) => metrics.push(MetricInstance {
                         key: name.to_ascii_uppercase(),
                         name: name.clone(),
+                        type_path: path.to_token_stream().to_string(),
                         instance: field
                             .original
                             .ident

@@ -4,7 +4,7 @@ use quote::{format_ident, quote};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
-use syn::{Error, Result};
+use syn::{Error, Path, Result};
 
 #[derive(Debug)]
 pub struct MetricScope {
@@ -30,7 +30,7 @@ impl MetricScope {
         let metric_inits = self
             .metrics
             .iter()
-            .map(|f| (f.instance.clone(), f.metric_type.to_string()))
+            .map(|f| (f.instance.clone(), f.type_path.clone()))
             .map(default_init);
         let other_inits = self.other_fields.iter().map(default_init);
         let sub_metrics = self.sub_metrics.iter().map(default_init);
@@ -98,6 +98,7 @@ impl MetricScope {
 pub struct MetricInstance {
     pub key: String,
     pub instance: String,
+    pub type_path: String,
     pub name: String,
     pub metric_type: MetricType,
     pub hidden: bool,
@@ -152,8 +153,9 @@ impl AsRef<str> for SubMetric {
 
 fn default_init((k, v): (impl AsRef<str>, impl AsRef<str>)) -> proc_macro2::TokenStream {
     let k = format_ident!("{}", k.as_ref());
-    let v = format_ident!("{}", v.as_ref());
-    quote! { #k: #v::new() }
+    let v = syn::parse_str::<Path>(v.as_ref()).expect(&format!("invalid path: {}", v.as_ref()));
+    let q = quote! { #k: #v::new() };
+    q
 }
 
 fn match_instance(metric: &MetricInstance, as_trait: Option<&str>) -> proc_macro2::TokenStream {

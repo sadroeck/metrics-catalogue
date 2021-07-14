@@ -20,6 +20,9 @@ struct Test {
     /// Subtypes
     my_test: SubTest,
     my_second_test: SubTest,
+
+    // Fully-qualified types
+    my_full_counter: ::metrics_catalogue::Counter,
 }
 
 #[derive(Catalogue)]
