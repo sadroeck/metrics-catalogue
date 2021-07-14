@@ -2,6 +2,14 @@
 name = "metrics-catalogue-macros"
 version = "0.1.0"
 edition = "2018"
+authors = ["Sam De Roeck <sadroeck@gmail.com>"]
+license = "Apache-2.0"
+description = "Macro core of the metrics-catalogue crate"
+repository = "https://github.com/sadroeck/metrics-catalogue"
+documentation = "https://docs.rs/metrics-catalogue"
+categories = ["metrics"]
+keywords = ["metrics", "metric", "catalogue", "prometheus", "macro"]
+readme = "README.md"
 
 [lib]
 proc-macro = true
