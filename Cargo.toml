@@ -7,7 +7,7 @@ license = "Apache-2.0"
 description = "Metrics Catalogue"
 repository = "https://github.com/sadroeck/metrics-catalogue"
 documentation = "https://docs.rs/metrics-catalogue"
-categories = ["metrics"]
+categories = ["development-tools::profiling"]
 keywords = ["metrics", "metric", "catalogue", "prometheus"]
 readme = "README.md"
 

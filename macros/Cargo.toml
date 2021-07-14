@@ -7,7 +7,7 @@ license = "Apache-2.0"
 description = "Macro core of the metrics-catalogue crate"
 repository = "https://github.com/sadroeck/metrics-catalogue"
 documentation = "https://docs.rs/metrics-catalogue"
-categories = ["metrics"]
+categories = ["development-tools::profiling"]
 keywords = ["metrics", "metric", "catalogue", "prometheus", "macro"]
 readme = "README.md"
 
