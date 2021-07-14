@@ -153,7 +153,8 @@ impl AsRef<str> for SubMetric {
 
 fn default_init((k, v): (impl AsRef<str>, impl AsRef<str>)) -> proc_macro2::TokenStream {
     let k = format_ident!("{}", k.as_ref());
-    let v = syn::parse_str::<Path>(v.as_ref()).expect(&format!("invalid path: {}", v.as_ref()));
+    let v = syn::parse_str::<Path>(v.as_ref())
+        .unwrap_or_else(|_| panic!("invalid path: {}", v.as_ref()));
     let q = quote! { #k: #v::new() };
     q
 }
