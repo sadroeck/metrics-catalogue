@@ -57,7 +57,7 @@ impl MetricScope {
             .map(|(k, _v)| {
                 let sub = format_ident!("{}", k);
                 let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
-                quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| self.#sub.find_counter(n))) }
+                quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| ::metrics_catalogue::Registry::find_counter(&self.#sub, n))) }
             });
         let gauges = match_metric_names(
             &self.metrics,
@@ -71,19 +71,19 @@ impl MetricScope {
             .map(|(k, _v)| {
                 let sub = format_ident!("{}", k);
                 let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
-                quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| self.#sub.find_gauge(n))) }
+                quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| ::metrics_catalogue::Registry::find_gauge(&self.#sub, n))) }
             });
 
         quote! {
-            impl Registry for #struct_name {
-                fn find_counter(&self, name: &str) -> Option<&Counter> {
+            impl ::metrics_catalogue::Registry for #struct_name {
+                fn find_counter(&self, name: &str) -> Option<&::metrics_catalogue::Counter> {
                     match name {
                         #(#counters),*
                     }
                     #(#sub_counters)*
                 }
 
-                fn find_gauge(&self, name: &str) -> Option<&dyn GaugeMetric> {
+                fn find_gauge(&self, name: &str) -> Option<&dyn ::metrics_catalogue::GaugeMetric> {
                     match name {
                         #(#gauges),*
                     }
@@ -162,7 +162,7 @@ fn match_instance(metric: &MetricInstance, as_trait: Option<&str>) -> proc_macro
     let quoted_name = name.to_string();
     if let Some(as_trait) = as_trait {
         let as_trait = format_ident!("{}", as_trait);
-        quote! { #quoted_name => Some(&self.#instance as &dyn #as_trait) }
+        quote! { #quoted_name => Some(&self.#instance as &dyn ::metrics_catalogue::#as_trait) }
     } else {
         quote! { #quoted_name => Some(&self.#instance) }
     }

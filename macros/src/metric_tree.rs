@@ -26,24 +26,25 @@ impl MetricTree {
         let root_name = self.root_scope.clone().expect("No root scope");
         let root_struct = format_ident!("{}", root_name);
         let recorder = quote! {
-            impl Recorder for #root_struct {
+            impl ::metrics_catalogue::Recorder for #root_struct {
                 // The following are unused in Stats
-                fn register_counter(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
+                fn register_counter(&self, _key: &::metrics_catalogue::Key, _unit: Option<::metrics_catalogue::Unit>, _desc: Option<&'static str>) {}
 
-                fn register_gauge(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
+                fn register_gauge(&self, _key: &::metrics_catalogue::Key, _unit: Option<::metrics_catalogue::Unit>, _desc: Option<&'static str>) {}
 
-                fn register_histogram(&self, _key: &Key, _unit: Option<Unit>, _desc: Option<&'static str>) {}
+                fn register_histogram(&self, _key: &::metrics_catalogue::Key, _unit: Option<::metrics_catalogue::Unit>, _desc: Option<&'static str>) {}
 
-                fn record_histogram(&self, _key: &Key, _value: f64) {}
+                fn record_histogram(&self, _key: &::metrics_catalogue::Key, _value: f64) {}
 
-                fn increment_counter(&self, key: &Key, value: u64) {
-                    if let Some(metric) = self.find_counter(key.name()) {
+                fn increment_counter(&self, key: &::metrics_catalogue::Key, value: u64) {
+                    if let Some(metric) = ::metrics_catalogue::Registry::find_counter(self, key.name()) {
                         metric.increment(value);
                     }
                 }
 
-                fn update_gauge(&self, key: &Key, value: GaugeValue) {
-                    if let Some(metric) = self.find_gauge(key.name()) {
+                fn update_gauge(&self, key: &::metrics_catalogue::Key, value: ::metrics_catalogue::GaugeValue) {
+                    use ::metrics_catalogue::GaugeValue;
+                    if let Some(metric) = ::metrics_catalogue::Registry::find_gauge(self, key.name()) {
                         match value {
                             GaugeValue::Increment(val) => metric.increase(val),
                             GaugeValue::Decrement(val) => metric.decrease(val),
