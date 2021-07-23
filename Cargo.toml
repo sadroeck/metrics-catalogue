@@ -17,3 +17,5 @@ members = [ "macros" ]
 [dependencies]
 metrics-catalogue-macros = { path = "macros", version = "0.1" }
 metrics = "0.16"
+metrics-util = "0.10"
+once_cell = "1.8"
