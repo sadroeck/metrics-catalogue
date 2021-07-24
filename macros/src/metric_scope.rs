@@ -177,8 +177,7 @@ fn default_init((k, v): (impl AsRef<str>, impl AsRef<str>)) -> proc_macro2::Toke
     let k = format_ident!("{}", k.as_ref());
     let v = syn::parse_str::<Path>(v.as_ref())
         .unwrap_or_else(|_| panic!("invalid path: {}", v.as_ref()));
-    let q = quote! { #k: #v::new() };
-    q
+    quote! { #k: #v::new() }
 }
 
 fn match_instance(metric: &MetricInstance, as_trait: Option<&str>) -> proc_macro2::TokenStream {
