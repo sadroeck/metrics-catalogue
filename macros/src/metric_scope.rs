@@ -1,3 +1,4 @@
+use crate::ast::TypePath;
 use crate::DEFAULT_SEPARATOR;
 use proc_macro2::Ident;
 use quote::{format_ident, quote};
@@ -30,7 +31,7 @@ impl MetricScope {
         let metric_inits = self
             .metrics
             .iter()
-            .map(|f| (f.instance.clone(), f.type_path.clone()))
+            .map(|f| (f.instance.clone(), f.type_path.full_path()))
             .map(default_init);
         let other_inits = self.other_fields.iter().map(default_init);
         let sub_metrics = self.sub_metrics.iter().map(default_init);
@@ -74,6 +75,17 @@ impl MetricScope {
                 quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| ::metrics_catalogue::Registry::find_gauge(&self.#sub, n))) }
             });
 
+        let histograms = match_metric_names(
+            &self.metrics,
+            &[MetricType::Histogram],
+            Some("HistogramMetric"),
+        );
+        let sub_histograms = self.sub_metrics.iter().filter(|(_, m)| !m.hidden).map(|(k, _v)| {
+            let sub = format_ident!("{}", k);
+            let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
+            quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| ::metrics_catalogue::Registry::find_histogram(&self.#sub, n))) }
+        });
+
         quote! {
             impl ::metrics_catalogue::Registry for #struct_name {
                 fn find_counter(&self, name: &str) -> Option<&::metrics_catalogue::Counter> {
@@ -89,6 +101,13 @@ impl MetricScope {
                     }
                     #(#sub_gauges)*
                 }
+
+                fn find_histogram(&self, name: &str) -> Option<&dyn ::metrics_catalogue::HistogramMetric> {
+                    match name {
+                        #(#histograms),*
+                    }
+                    #(#sub_histograms)*
+                }
             }
         }
     }
@@ -98,7 +117,7 @@ impl MetricScope {
 pub struct MetricInstance {
     pub key: String,
     pub instance: String,
-    pub type_path: String,
+    pub type_path: TypePath,
     pub name: String,
     pub metric_type: MetricType,
     pub hidden: bool,
@@ -109,6 +128,7 @@ pub enum MetricType {
     Counter,
     Gauge,
     DiscreteGauge,
+    Histogram,
 }
 
 impl fmt::Display for MetricType {
@@ -117,6 +137,7 @@ impl fmt::Display for MetricType {
             MetricType::Counter => "Counter",
             MetricType::Gauge => "Gauge",
             MetricType::DiscreteGauge => "DiscreteGauge",
+            MetricType::Histogram => "Histogram",
         };
         write!(f, "{}", name)
     }
@@ -131,6 +152,7 @@ impl TryFrom<&Ident> for MetricType {
             "Counter" => Ok(MetricType::Counter),
             "Gauge" => Ok(MetricType::Gauge),
             "DiscreteGauge" => Ok(MetricType::DiscreteGauge),
+            "Histogram" => Ok(MetricType::Histogram),
             unknown => Err(Error::new_spanned(
                 ident,
                 format!("Unknown metric type: {}", unknown),

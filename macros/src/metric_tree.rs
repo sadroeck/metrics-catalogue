@@ -1,7 +1,7 @@
-use crate::ast::Struct;
+use crate::ast::{Struct, TypePath};
 use crate::metric_scope::{MetricInstance, MetricScope, MetricType, SubMetric};
 use crate::scoped_catalogue::ScopedCatalogue;
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use syn::{Data, DeriveInput, Error, Result, Type};
@@ -34,7 +34,11 @@ impl MetricTree {
 
                 fn register_histogram(&self, _key: &::metrics_catalogue::Key, _unit: Option<::metrics_catalogue::Unit>, _desc: Option<&'static str>) {}
 
-                fn record_histogram(&self, _key: &::metrics_catalogue::Key, _value: f64) {}
+                fn record_histogram(&self, key: &::metrics_catalogue::Key, value: f64) {
+                    if let Some(metric) = ::metrics_catalogue::Registry::find_histogram(self, key.name()) {
+                        metric.insert(value);
+                    }
+                }
 
                 fn increment_counter(&self, key: &::metrics_catalogue::Key, value: u64) {
                     if let Some(metric) = ::metrics_catalogue::Registry::find_counter(self, key.name()) {
@@ -140,6 +144,7 @@ impl MetricTree {
                     return Err(Error::new_spanned(&input, "Invalid type for metrics"));
                 };
 
+                let type_path = TypePath::from(&path.path);
                 let ident = &path
                     .path
                     .segments
@@ -152,7 +157,7 @@ impl MetricTree {
                     Ok(metric_type) => metrics.push(MetricInstance {
                         key: name.to_ascii_uppercase(),
                         name: name.clone(),
-                        type_path: path.to_token_stream().to_string(),
+                        type_path,
                         instance: field
                             .original
                             .ident

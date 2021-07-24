@@ -3,8 +3,16 @@ use once_cell::sync::OnceCell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
+pub trait HistogramMetric {
+    /// Adds a sample to the container
+    fn insert(&self, val: f64);
+    /// Returns a list of the current samples in the container
+    fn read(&self) -> Vec<f64>;
+}
+
 /// Mimics a [`metrics-core`] histogram container for bucketed sample grouping.
 /// Provides an automatic retention of samples
+#[derive(Debug)]
 pub struct Histogram<const RETENTION: u64> {
     // TODO: Migrate from a lazily initialized cell to a const initializable container
     bucket: OnceCell<AtomicBucket<f64>>,
@@ -17,20 +25,6 @@ impl<const RETENTION: u64> Histogram<RETENTION> {
             bucket: OnceCell::new(),
             started: AtomicU64::new(0),
         }
-    }
-
-    /// Adds a sample to the [`Histogram`]
-    #[inline]
-    pub fn insert(&self, val: f64) {
-        self.clear_if_timeout();
-        self.bucket.get_or_init(AtomicBucket::new).push(val)
-    }
-
-    /// Read the current state of the [`Histogram`]
-    #[inline]
-    pub fn read(&self) -> Vec<f64> {
-        self.clear_if_timeout();
-        self.bucket.get_or_init(AtomicBucket::new).data()
     }
 
     #[inline]
@@ -58,5 +52,21 @@ impl<const RETENTION: u64> Histogram<RETENTION> {
                 bucket.clear();
             }
         }
+    }
+}
+
+impl<const RET: u64> HistogramMetric for Histogram<RET> {
+    /// Adds a sample to the [`Histogram`]
+    #[inline]
+    fn insert(&self, val: f64) {
+        self.clear_if_timeout();
+        self.bucket.get_or_init(AtomicBucket::new).push(val)
+    }
+
+    /// Read the current state of the [`Histogram`]
+    #[inline]
+    fn read(&self) -> Vec<f64> {
+        self.clear_if_timeout();
+        self.bucket.get_or_init(AtomicBucket::new).data()
     }
 }

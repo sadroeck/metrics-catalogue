@@ -1,6 +1,10 @@
 use crate::{ROOT_MARKER, SKIP_MARKER};
 use proc_macro2::Ident;
-use syn::{Attribute, DataStruct, DeriveInput, Fields, Lit, Meta, NestedMeta, Result, Type};
+use quote::ToTokens;
+use syn::{
+    Attribute, DataStruct, DeriveInput, Fields, Lit, Meta, NestedMeta, Path, PathSegment, Result,
+    Type,
+};
 
 pub struct Field<'a> {
     pub original: &'a syn::Field,
@@ -95,5 +99,44 @@ impl Attributes {
         }
 
         attributes
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TypePath {
+    pub path: String,
+    pub args: Option<String>,
+}
+
+impl TypePath {
+    pub fn full_path(&self) -> String {
+        if let Some(args) = self.args.as_ref() {
+            format!("{}::{}", self.path, args)
+        } else {
+            self.path.clone()
+        }
+    }
+}
+
+impl From<&Path> for TypePath {
+    fn from(path: &Path) -> Self {
+        let segment_count = path.segments.len();
+        let mut segments = path
+            .segments
+            .iter()
+            .take(segment_count - 1)
+            .map(PathSegment::to_token_stream)
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>();
+        let last_segment = path.segments.last().unwrap();
+        segments.push(last_segment.ident.to_token_stream().to_string());
+        TypePath {
+            path: segments.join("::"),
+            args: if last_segment.arguments.is_empty() {
+                None
+            } else {
+                Some(last_segment.arguments.to_token_stream().to_string())
+            },
+        }
     }
 }
