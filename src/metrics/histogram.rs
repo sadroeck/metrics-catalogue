@@ -3,8 +3,6 @@ use once_cell::sync::OnceCell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
-const BUCKET_RETENTION_PERIOD: Duration = Duration::from_secs(60);
-
 /// Mimics a [`metrics-core`] histogram container for bucketed sample grouping.
 /// Provides an automatic retention of samples
 pub struct Histogram<const RETENTION: u64> {
@@ -13,7 +11,7 @@ pub struct Histogram<const RETENTION: u64> {
     started: AtomicU64,
 }
 
-impl Histogram {
+impl<const RETENTION: u64> Histogram<RETENTION> {
     pub const fn new() -> Self {
         Self {
             bucket: OnceCell::new(),
