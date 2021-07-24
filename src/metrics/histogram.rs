@@ -38,12 +38,12 @@ impl Histogram {
     #[inline]
     fn clear_if_timeout(&self) {
         let started = self.started.load(Ordering::Acquire);
-        if SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH + Duration::from_nanos(started))
-            .map(|duration| duration >= BUCKET_RETENTION_PERIOD)
-            .unwrap_or(false)
-        {
-            if self
+        let reached_window = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH + Duration::from_secs(started))
+            .map(|duration| duration >= Duration::from_secs(RETENTION))
+            .unwrap_or(false);
+        if reached_window
+            && self
                 .started
                 .compare_exchange(
                     started,
@@ -55,10 +55,9 @@ impl Histogram {
                     Ordering::Relaxed,
                 )
                 .is_ok()
-            {
-                if let Some(bucket) = self.bucket.get() {
-                    bucket.clear();
-                }
+        {
+            if let Some(bucket) = self.bucket.get() {
+                bucket.clear();
             }
         }
     }
