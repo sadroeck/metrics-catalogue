@@ -1,4 +1,4 @@
-use crate::ast::{Struct, TypePath};
+use crate::ast::{Attributes, Struct, TypePath};
 use crate::metric_scope::{MetricInstance, MetricScope, MetricType, SubMetric};
 use crate::scoped_catalogue::ScopedCatalogue;
 use quote::{format_ident, quote};
@@ -111,7 +111,7 @@ impl MetricTree {
             )),
         }?;
 
-        if struct_data.attributes.is_root && self.root_scope.is_some() {
+        if matches!(struct_data.attributes, Attributes::Root(_)) && self.root_scope.is_some() {
             return Err(Error::new_spanned(
                 &input,
                 format!(
@@ -120,7 +120,7 @@ impl MetricTree {
                 ),
             ));
         }
-        if struct_data.attributes.is_root {
+        if matches!(struct_data.attributes, Attributes::Root(_)) {
             self.root_scope.get_or_insert(struct_data.ident.to_string());
         }
 
@@ -128,7 +128,7 @@ impl MetricTree {
         let mut other_fields = HashMap::new();
         let mut sub_metrics = HashMap::new();
         for field in &struct_data.fields {
-            if !field.attributes.hidden {
+            if !field.attributes.is_hidden() {
                 let name = field.get_metric().ok_or_else(|| {
                     Error::new_spanned(
                         &input,
@@ -165,7 +165,7 @@ impl MetricTree {
                             .ok_or_else(|| Error::new_spanned(field.original, "No field identity"))?
                             .to_string(),
                         metric_type,
-                        hidden: field.attributes.hidden,
+                        hidden: field.attributes.is_hidden(),
                     }),
                     Err(_err) => {
                         // Should be a subtype
@@ -182,7 +182,7 @@ impl MetricTree {
                             orig.ident.as_ref().expect("No identity").to_string(),
                             SubMetric {
                                 ident: field_type.to_string(),
-                                hidden: field.attributes.hidden,
+                                hidden: field.attributes.is_hidden(),
                             },
                         );
                     }
