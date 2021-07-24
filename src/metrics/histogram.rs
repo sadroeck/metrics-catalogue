@@ -5,7 +5,10 @@ use std::time::{Duration, SystemTime};
 
 const BUCKET_RETENTION_PERIOD: Duration = Duration::from_secs(60);
 
-pub struct Histogram {
+/// Mimics a [`metrics-core`] histogram container for bucketed sample grouping.
+/// Provides an automatic retention of samples
+pub struct Histogram<const RETENTION: u64> {
+    // TODO: Migrate from a lazily initialized cell to a const initializable container
     bucket: OnceCell<AtomicBucket<f64>>,
     started: AtomicU64,
 }
