@@ -1,4 +1,4 @@
-use crate::{ROOT_MARKER, SKIP_MARKER};
+use crate::{ROOT_MARKER, SEPARATOR_MARKER, SKIP_MARKER};
 use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{
@@ -26,14 +26,21 @@ impl<'a> Field<'a> {
     }
 
     pub fn get_metric(&self) -> Option<String> {
-        if self.attributes.hidden {
-            return None;
-        }
-
-        if let Some(name) = &self.attributes.name_override {
-            Some(name.clone())
-        } else {
-            self.original.ident.as_ref().map(|x| x.to_string())
+        match &self.attributes {
+            Attributes::Root(_) => None,
+            Attributes::Struct(StructAttributes {
+                hidden,
+                name_override,
+            }) => {
+                if *hidden {
+                    return None;
+                }
+                if let Some(name) = &name_override {
+                    Some(name.clone())
+                } else {
+                    self.original.ident.as_ref().map(|x| x.to_string())
+                }
+            }
         }
     }
 }
@@ -56,16 +63,34 @@ impl<'a> Struct<'a> {
     }
 }
 
+#[derive(Debug)]
+pub enum Attributes {
+    Root(RootAttributes),
+    Struct(StructAttributes),
+}
+
 #[derive(Default, Debug)]
-pub struct Attributes {
+pub struct RootAttributes {
+    pub separator: Option<String>,
+}
+
+#[derive(Default, Debug)]
+pub struct StructAttributes {
     pub hidden: bool,
     pub name_override: Option<String>,
-    pub is_root: bool,
 }
 
 impl Attributes {
+    pub fn is_hidden(&self) -> bool {
+        match self {
+            Self::Struct(s) => s.hidden,
+            Self::Root(_) => false,
+        }
+    }
+
     pub fn from_node(attrs: &[Attribute]) -> Self {
-        let mut attributes = Attributes::default();
+        let mut root = None;
+        let mut attributes = StructAttributes::default();
         for attr in attrs {
             if let Ok(meta) = attr.parse_meta() {
                 if let Some(ident) = meta.path().get_ident() {
@@ -79,7 +104,16 @@ impl Attributes {
                                                 attributes.hidden = true;
                                             }
                                             if m.path().is_ident(ROOT_MARKER) {
-                                                attributes.is_root = true;
+                                                root.get_or_insert(RootAttributes::default());
+                                            }
+                                            if let Meta::NameValue(val) = m {
+                                                if val.path.is_ident(SEPARATOR_MARKER) {
+                                                    if let Lit::Str(sep) = &val.lit {
+                                                        root.as_mut().expect("Separator cannot be specified on a non-root element").separator = Some(sep.value());
+                                                    } else {
+                                                        panic!("Separator should be specified as a string")
+                                                    }
+                                                }
                                             }
                                         }
                                         NestedMeta::Lit(lit) => {
@@ -98,7 +132,11 @@ impl Attributes {
             }
         }
 
-        attributes
+        if let Some(root) = root {
+            Self::Root(root)
+        } else {
+            Self::Struct(attributes)
+        }
     }
 }
 

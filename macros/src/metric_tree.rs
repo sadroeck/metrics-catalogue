@@ -1,6 +1,7 @@
-use crate::ast::{Struct, TypePath};
+use crate::ast::{Attributes, Struct, TypePath};
 use crate::metric_scope::{MetricInstance, MetricScope, MetricType, SubMetric};
 use crate::scoped_catalogue::ScopedCatalogue;
+use crate::DEFAULT_SEPARATOR;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -11,6 +12,7 @@ pub struct MetricTree {
     scopes: HashMap<String, MetricScope>,
     required_scopes: HashSet<String>,
     root_scope: Option<String>,
+    key_separator: String,
 }
 
 impl MetricTree {
@@ -67,7 +69,10 @@ impl MetricTree {
     pub fn generate(&self) -> proc_macro2::TokenStream {
         let root = self.generate_root();
         let catalogue = self.generate_catalogue();
-        let scopes = self.scopes.values().map(MetricScope::generate);
+        let scopes = self
+            .scopes
+            .values()
+            .map(|scope| scope.generate(&self.key_separator));
         let combined = std::iter::once(root)
             .chain(std::iter::once(catalogue))
             .chain(scopes);
@@ -99,7 +104,7 @@ impl MetricTree {
     fn generate_catalogue(&self) -> proc_macro2::TokenStream {
         let root_struct = self.root_scope.clone().expect("No root struct");
         self.generate_scoped_catalogue("catalogue", &root_struct)
-            .generate_namespaced_keys()
+            .generate_namespaced_keys(&self.key_separator)
     }
 
     pub fn parse_struct(&mut self, input: DeriveInput) -> Result<()> {
@@ -111,7 +116,7 @@ impl MetricTree {
             )),
         }?;
 
-        if struct_data.attributes.is_root && self.root_scope.is_some() {
+        if matches!(struct_data.attributes, Attributes::Root(_)) && self.root_scope.is_some() {
             return Err(Error::new_spanned(
                 &input,
                 format!(
@@ -120,15 +125,21 @@ impl MetricTree {
                 ),
             ));
         }
-        if struct_data.attributes.is_root {
+
+        if let Attributes::Root(root) = &struct_data.attributes {
             self.root_scope.get_or_insert(struct_data.ident.to_string());
+            self.key_separator = root
+                .separator
+                .as_deref()
+                .unwrap_or(DEFAULT_SEPARATOR)
+                .to_string();
         }
 
         let mut metrics = vec![];
         let mut other_fields = HashMap::new();
         let mut sub_metrics = HashMap::new();
         for field in &struct_data.fields {
-            if !field.attributes.hidden {
+            if !field.attributes.is_hidden() {
                 let name = field.get_metric().ok_or_else(|| {
                     Error::new_spanned(
                         &input,
@@ -165,7 +176,7 @@ impl MetricTree {
                             .ok_or_else(|| Error::new_spanned(field.original, "No field identity"))?
                             .to_string(),
                         metric_type,
-                        hidden: field.attributes.hidden,
+                        hidden: field.attributes.is_hidden(),
                     }),
                     Err(_err) => {
                         // Should be a subtype
@@ -182,7 +193,7 @@ impl MetricTree {
                             orig.ident.as_ref().expect("No identity").to_string(),
                             SubMetric {
                                 ident: field_type.to_string(),
-                                hidden: field.attributes.hidden,
+                                hidden: field.attributes.is_hidden(),
                             },
                         );
                     }

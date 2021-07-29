@@ -14,7 +14,7 @@ pub trait HistogramMetric {
 /// Provides an automatic retention of samples
 #[derive(Debug)]
 pub struct Histogram<const RETENTION: u64> {
-    // TODO: Migrate from a lazily initialized cell to a const initializable container
+    // TODO: Migrate from a lazily initialized cell to a const initialisable container
     bucket: OnceCell<AtomicBucket<f64>>,
     started: AtomicU64,
 }
