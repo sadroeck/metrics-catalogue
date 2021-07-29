@@ -1,4 +1,4 @@
-use crate::{ROOT_MARKER, SKIP_MARKER};
+use crate::{ROOT_MARKER, SEPARATOR_MARKER, SKIP_MARKER};
 use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{
@@ -105,6 +105,15 @@ impl Attributes {
                                             }
                                             if m.path().is_ident(ROOT_MARKER) {
                                                 root.get_or_insert(RootAttributes::default());
+                                            }
+                                            if let Meta::NameValue(val) = m {
+                                                if val.path.is_ident(SEPARATOR_MARKER) {
+                                                    if let Lit::Str(sep) = &val.lit {
+                                                        root.as_mut().expect("Separator cannot be specified on a non-root element").separator = Some(sep.value());
+                                                    } else {
+                                                        panic!("Separator should be specified as a string")
+                                                    }
+                                                }
                                             }
                                         }
                                         NestedMeta::Lit(lit) => {

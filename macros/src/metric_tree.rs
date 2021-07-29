@@ -1,6 +1,7 @@
 use crate::ast::{Attributes, Struct, TypePath};
 use crate::metric_scope::{MetricInstance, MetricScope, MetricType, SubMetric};
 use crate::scoped_catalogue::ScopedCatalogue;
+use crate::DEFAULT_SEPARATOR;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -11,6 +12,7 @@ pub struct MetricTree {
     scopes: HashMap<String, MetricScope>,
     required_scopes: HashSet<String>,
     root_scope: Option<String>,
+    key_separator: String,
 }
 
 impl MetricTree {
@@ -67,7 +69,10 @@ impl MetricTree {
     pub fn generate(&self) -> proc_macro2::TokenStream {
         let root = self.generate_root();
         let catalogue = self.generate_catalogue();
-        let scopes = self.scopes.values().map(MetricScope::generate);
+        let scopes = self
+            .scopes
+            .values()
+            .map(|scope| scope.generate(&self.key_separator));
         let combined = std::iter::once(root)
             .chain(std::iter::once(catalogue))
             .chain(scopes);
@@ -99,7 +104,7 @@ impl MetricTree {
     fn generate_catalogue(&self) -> proc_macro2::TokenStream {
         let root_struct = self.root_scope.clone().expect("No root struct");
         self.generate_scoped_catalogue("catalogue", &root_struct)
-            .generate_namespaced_keys()
+            .generate_namespaced_keys(&self.key_separator)
     }
 
     pub fn parse_struct(&mut self, input: DeriveInput) -> Result<()> {
@@ -120,8 +125,15 @@ impl MetricTree {
                 ),
             ));
         }
-        if matches!(struct_data.attributes, Attributes::Root(_)) {
+
+        if let Attributes::Root(root) = &struct_data.attributes {
             self.root_scope.get_or_insert(struct_data.ident.to_string());
+            self.key_separator = root
+                .separator
+                .as_ref()
+                .map(String::as_str)
+                .unwrap_or(DEFAULT_SEPARATOR)
+                .to_string();
         }
 
         let mut metrics = vec![];

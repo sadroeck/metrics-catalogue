@@ -1,5 +1,4 @@
 use crate::ast::TypePath;
-use crate::DEFAULT_SEPARATOR;
 use proc_macro2::Ident;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
@@ -16,9 +15,9 @@ pub struct MetricScope {
 }
 
 impl MetricScope {
-    pub fn generate(&self) -> proc_macro2::TokenStream {
+    pub fn generate(&self, key_separator: &str) -> proc_macro2::TokenStream {
         let initialize = self.generate_init();
-        let registry_trait = self.generate_registry_trait();
+        let registry_trait = self.generate_registry_trait(key_separator);
         quote! {
             #initialize
 
@@ -48,7 +47,7 @@ impl MetricScope {
         }
     }
 
-    fn generate_registry_trait(&self) -> proc_macro2::TokenStream {
+    fn generate_registry_trait(&self, key_separator: &str) -> proc_macro2::TokenStream {
         let struct_name = format_ident!("{}", &self.struct_name);
         let counters = match_metric_names(&self.metrics, &[MetricType::Counter], None);
         let sub_counters = self
@@ -57,7 +56,7 @@ impl MetricScope {
             .filter(|(_, m)| !m.hidden)
             .map(|(k, _v)| {
                 let sub = format_ident!("{}", k);
-                let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
+                let prefix = format!("{}{}", k, key_separator);
                 quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| ::metrics_catalogue::Registry::find_counter(&self.#sub, n))) }
             });
         let gauges = match_metric_names(
@@ -71,7 +70,7 @@ impl MetricScope {
             .filter(|(_, m)| !m.hidden)
             .map(|(k, _v)| {
                 let sub = format_ident!("{}", k);
-                let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
+                let prefix = format!("{}{}", k, key_separator);
                 quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| ::metrics_catalogue::Registry::find_gauge(&self.#sub, n))) }
             });
 
@@ -82,7 +81,7 @@ impl MetricScope {
         );
         let sub_histograms = self.sub_metrics.iter().filter(|(_, m)| !m.hidden).map(|(k, _v)| {
             let sub = format_ident!("{}", k);
-            let prefix = format!("{}{}", k, DEFAULT_SEPARATOR);
+            let prefix = format!("{}{}", k, key_separator);
             quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| ::metrics_catalogue::Registry::find_histogram(&self.#sub, n))) }
         });
 

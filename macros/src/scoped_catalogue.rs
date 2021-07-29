@@ -1,4 +1,3 @@
-use crate::DEFAULT_SEPARATOR;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
@@ -10,7 +9,7 @@ pub struct ScopedCatalogue {
 }
 
 impl ScopedCatalogue {
-    fn generate_prefix_keys(&self, prefix: &str) -> TokenStream {
+    fn generate_prefix_keys(&self, prefix: &str, separator: &str) -> TokenStream {
         let metric_keys = self.metrics.iter().map(|(k, v)| {
             let key = format_ident!("{}", k);
             let name = format!("{}{}", prefix, v);
@@ -18,8 +17,8 @@ impl ScopedCatalogue {
             quote! { pub const #kv; }
         });
         let sub_metric_spaces = self.sub_scopes.iter().map(|(name, scope)| {
-            let prefix = format!("{}{}{}", prefix, name, DEFAULT_SEPARATOR);
-            scope.generate_prefix_keys(&prefix)
+            let prefix = format!("{}{}{}", prefix, name, separator);
+            scope.generate_prefix_keys(&prefix, separator)
         });
         let keys = metric_keys.chain(sub_metric_spaces);
         let name_mod = format_ident!("{}", self.mod_name);
@@ -31,7 +30,7 @@ impl ScopedCatalogue {
         }
     }
 
-    pub fn generate_namespaced_keys(&self) -> TokenStream {
-        self.generate_prefix_keys("")
+    pub fn generate_namespaced_keys(&self, separator: &str) -> TokenStream {
+        self.generate_prefix_keys("", separator)
     }
 }

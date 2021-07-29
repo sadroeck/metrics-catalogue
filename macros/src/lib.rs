@@ -13,7 +13,8 @@ mod scoped_catalogue;
 
 const SKIP_MARKER: &str = "skip";
 const ROOT_MARKER: &str = "root";
-const DEFAULT_SEPARATOR: char = '.';
+const SEPARATOR_MARKER: &str = "separator";
+const DEFAULT_SEPARATOR: &str = ".";
 
 lazy_static::lazy_static! {
     /// Hierarchical mapping of metric scopes
