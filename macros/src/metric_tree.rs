@@ -130,8 +130,7 @@ impl MetricTree {
             self.root_scope.get_or_insert(struct_data.ident.to_string());
             self.key_separator = root
                 .separator
-                .as_ref()
-                .map(String::as_str)
+                .as_deref()
                 .unwrap_or(DEFAULT_SEPARATOR)
                 .to_string();
         }
