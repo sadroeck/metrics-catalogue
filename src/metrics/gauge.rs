@@ -17,7 +17,7 @@ pub trait GaugeMetric {
     /// Decreases the value of the [`Gauge`] by a real amount
     fn decrease(&self, val: f64);
     /// Read the current state of the [`Gauge`]
-    fn read(&self) -> u64;
+    fn read(&self) -> f64;
 }
 
 impl GaugeMetric for DiscreteGauge {
@@ -41,8 +41,8 @@ impl GaugeMetric for DiscreteGauge {
 
     /// Read the current state of the [`DiscreteGauge`]
     #[inline]
-    fn read(&self) -> u64 {
-        self.0.load(Ordering::Relaxed)
+    fn read(&self) -> f64 {
+        self.0.load(Ordering::Relaxed) as f64
     }
 }
 
@@ -97,7 +97,7 @@ impl GaugeMetric for Gauge {
 
     /// Read the current state of the [`Gauge`]
     #[inline]
-    fn read(&self) -> u64 {
-        self.0.load(Ordering::Relaxed)
+    fn read(&self) -> f64 {
+        f64::from_bits(self.0.load(Ordering::Relaxed))
     }
 }
