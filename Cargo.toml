@@ -1,6 +1,6 @@
 [package]
 name = "metrics-catalogue"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2018"
 authors = ["Sam De Roeck <sadroeck@gmail.com>"]
 license = "Apache-2.0"
