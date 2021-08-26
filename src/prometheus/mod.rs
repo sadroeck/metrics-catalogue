@@ -3,9 +3,11 @@ use crate::{Counter, DiscreteGauge, Gauge, GaugeMetric, Histogram, HistogramMetr
 use metrics_util::Summary;
 use std::iter::{empty, once};
 
+mod server;
 mod utils;
 
-const QUANTILES: [f64; 4] = [0.0, 0.5, 0.9, 0.99];
+pub use server::Server;
+
 
 pub trait StringRender {
     fn render(&self, prefix: &str, name: &str, s: &mut String);
