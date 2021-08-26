@@ -1,5 +1,6 @@
 mod metrics;
-mod prometheus;
+#[cfg(feature = "prometheus")]
+pub mod prometheus;
 mod registry;
 
 /// Export metrics types
@@ -11,6 +12,3 @@ pub use ::metrics::*;
 pub use metrics_catalogue_macros::Catalogue;
 /// Export registry trait
 pub use registry::Registry;
-
-#[cfg(feature = "prometheus")]
-pub use prometheus::*;

@@ -14,16 +14,20 @@ pub enum Label<T: Display> {
     KeyValue((&'static str, T)),
 }
 
-pub(super) fn write_type_line(buffer: &mut String, name: &str, metric_type: &str) {
+#[inline]
+pub(super) fn write_type_line(buffer: &mut String, prefix: &str, name: &str, metric_type: &str) {
     buffer.push_str("# TYPE ");
+    buffer.push_str(prefix);
     buffer.push_str(name);
     buffer.push(' ');
     buffer.push_str(metric_type);
     buffer.push('\n');
 }
 
+#[inline]
 pub(super) fn write_metric_line<L, V, LB>(
     buffer: &mut String,
+    prefix: &str,
     name: &str,
     suffix: Option<&'static str>,
     labels: LB,
@@ -33,6 +37,7 @@ pub(super) fn write_metric_line<L, V, LB>(
     V: Display,
     LB: Iterator<Item = Label<L>>,
 {
+    buffer.push_str(prefix);
     buffer.push_str(name);
     if let Some(suffix) = suffix {
         buffer.push('_');

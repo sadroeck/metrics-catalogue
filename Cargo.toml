@@ -16,7 +16,8 @@ members = [ "macros" ]
 
 
 [features]
-prometheus = []
+default = ["prometheus"]
+prometheus = [ "metrics-catalogue-macros/prometheus" ]
 
 [dependencies]
 metrics-catalogue-macros = { path = "macros", version = "0.1" }

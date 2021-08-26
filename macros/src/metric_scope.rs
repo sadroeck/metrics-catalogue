@@ -18,10 +18,17 @@ impl MetricScope {
     pub fn generate(&self, key_separator: &str) -> proc_macro2::TokenStream {
         let initialize = self.generate_init();
         let registry_trait = self.generate_registry_trait(key_separator);
+        #[cfg(feature = "prometheus")]
+        let prometheus = self.generate_prometheus(key_separator);
+        #[cfg(not(feature = "prometheus"))]
+        let prometheus = quote! {};
+
         quote! {
             #initialize
 
             #registry_trait
+
+            #prometheus
         }
     }
 
@@ -106,6 +113,54 @@ impl MetricScope {
                         #(#histograms),*
                     }
                     #(#sub_histograms)*
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "prometheus")]
+    fn generate_prometheus(&self, key_separator: &str) -> proc_macro2::TokenStream {
+        let struct_name = format_ident!("{}", &self.struct_name);
+        let needs_new_prefix = self.metrics.iter().filter(|m| !m.hidden).count()
+            + self.sub_metrics.iter().filter(|(_, m)| !m.hidden).count()
+            > 0;
+        let new_prefix = if needs_new_prefix {
+            let formatter = format!("{{}}{{}}{}", key_separator);
+            let name_formatter = format!("{{}}{}", key_separator);
+            quote! {
+                let prefix = if !prefix.is_empty() {
+                    std::borrow::Cow::Owned(format!(#formatter, prefix, name))
+                } else if !name.is_empty() {
+                    std::borrow::Cow::Owned(format!(#name_formatter, name))
+                } else {
+                    std::borrow::Cow::Borrowed("")
+                };
+            }
+        } else {
+            quote! {}
+        };
+        let fields = self.metrics.iter().filter(|m| !m.hidden).map(|metric| {
+            let instance = format_ident!("{}", metric.instance);
+            let name = metric.name.clone();
+            quote! { ::metrics_catalogue::prometheus::StringRender::render(&self.#instance, &prefix, #name, s); }
+        });
+        let sub_metrics = self
+            .sub_metrics
+            .iter()
+            .filter(|(_, m)| !m.hidden)
+            .map(|(k, _v)| {
+                let sub = format_ident!("{}", k);
+                let name = k.to_string();
+                quote! { ::metrics_catalogue::prometheus::StringRender::render(&self.#sub, &prefix, #name, s); }
+            });
+
+        quote! {
+            impl ::metrics_catalogue::prometheus::StringRender for #struct_name {
+                fn render(&self, prefix: &str, name: &str, s: &mut String) {
+                    #new_prefix
+                    #(#fields)*
+
+                    #(#sub_metrics)*
                 }
             }
         }

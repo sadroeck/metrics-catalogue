@@ -8,60 +8,60 @@ mod utils;
 const QUANTILES: [f64; 4] = [0.0, 0.5, 0.9, 0.99];
 
 pub trait StringRender {
-    fn render(&self, name: &str, s: &mut String);
+    fn render(&self, prefix: &str, name: &str, s: &mut String);
 }
 
 impl StringRender for Counter {
-    fn render(&self, name: &str, s: &mut String) {
+    fn render(&self, prefix: &str, name: &str, s: &mut String) {
         // TODO: Process description
         // if let Some(desc) = descriptions.get(name.as_str()) {
         //     write_help_line(&mut output, name.as_str(), desc);
         // }
-        write_type_line(s, name, "counter");
+        write_type_line(s, prefix, name, "counter");
 
         // TODO: process labels
         let labels = empty();
-        write_metric_line::<&str, u64, _>(s, name, None, labels, self.read());
+        write_metric_line::<&str, u64, _>(s, prefix, name, None, labels, self.read());
         s.push('\n');
     }
 }
 
 #[inline]
-fn render_gauge<G: GaugeMetric>(g: &G, name: &str, s: &mut String) {
+fn render_gauge<G: GaugeMetric>(g: &G, prefix: &str, name: &str, s: &mut String) {
     // TODO: Process description
     // if let Some(desc) = descriptions.get(name.as_str()) {
     //     write_help_line(&mut output, name.as_str(), desc);
     // }
 
-    write_type_line(s, name, "gauge");
+    write_type_line(s, prefix, name, "gauge");
     // TODO: process labels
     let labels = empty();
-    write_metric_line::<&str, f64, _>(s, name, None, labels, g.read());
+    write_metric_line::<&str, f64, _>(s, prefix, name, None, labels, g.read());
     s.push('\n');
 }
 
 impl StringRender for Gauge {
     #[inline]
-    fn render(&self, name: &str, s: &mut String) {
-        render_gauge(self, name, s)
+    fn render(&self, prefix: &str, name: &str, s: &mut String) {
+        render_gauge(self, prefix, name, s)
     }
 }
 
 impl StringRender for DiscreteGauge {
     #[inline]
-    fn render(&self, name: &str, s: &mut String) {
-        render_gauge(self, name, s)
+    fn render(&self, prefix: &str, name: &str, s: &mut String) {
+        render_gauge(self, prefix, name, s)
     }
 }
 
 #[inline]
-fn render_histogram<H: HistogramMetric>(h: &H, name: &str, s: &mut String) {
+fn render_histogram<H: HistogramMetric>(h: &H, prefix: &str, name: &str, s: &mut String) {
     // TODO: Process description
     // if let Some(desc) = descriptions.get(name.as_str()) {
     //     write_help_line(&mut output, name.as_str(), desc);
     // }
 
-    write_type_line(s, name, "histogram");
+    write_type_line(s, prefix, name, "histogram");
     // TODO: process labels
     let labels = empty();
     let mut summary = Summary::with_defaults();
@@ -76,16 +76,18 @@ fn render_histogram<H: HistogramMetric>(h: &H, name: &str, s: &mut String) {
         let value = summary.quantile(q).unwrap_or(0.0);
         write_metric_line(
             s,
-            &name,
+            prefix,
+            name,
             None,
             labels.clone().chain(once(Label::KeyValue(("quantile", q)))),
             value,
         );
     }
-    write_metric_line(s, &name, Some("sum"), empty::<Label<usize>>(), sum);
+    write_metric_line(s, prefix, name, Some("sum"), empty::<Label<usize>>(), sum);
     write_metric_line(
         s,
-        &name,
+        prefix,
+        name,
         Some("count"),
         empty::<Label<usize>>(),
         count as u64,
@@ -96,7 +98,7 @@ fn render_histogram<H: HistogramMetric>(h: &H, name: &str, s: &mut String) {
 
 impl<const RETENTION: u64> StringRender for Histogram<RETENTION> {
     #[inline]
-    fn render(&self, name: &str, s: &mut String) {
-        render_histogram(self, name, s)
+    fn render(&self, prefix: &str, name: &str, s: &mut String) {
+        render_histogram(self, prefix, name, s)
     }
 }
