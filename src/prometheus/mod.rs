@@ -8,12 +8,28 @@ mod utils;
 
 pub use server::Server;
 
+pub const QUANTILES: [f64; 4] = [0.0, 0.5, 0.9, 0.99];
 
 pub trait StringRender {
     fn render(&self, prefix: &str, name: &str, s: &mut String);
 }
 
+impl<S: StringRender> StringRender for &S {
+    #[inline]
+    fn render(&self, prefix: &str, name: &str, s: &mut String) {
+        <S as StringRender>::render(self, prefix, name, s)
+    }
+}
+
+impl<S: StringRender> StringRender for std::sync::Arc<S> {
+    #[inline]
+    fn render(&self, prefix: &str, name: &str, s: &mut String) {
+        <S as StringRender>::render(self, prefix, name, s)
+    }
+}
+
 impl StringRender for Counter {
+    #[inline]
     fn render(&self, prefix: &str, name: &str, s: &mut String) {
         // TODO: Process description
         // if let Some(desc) = descriptions.get(name.as_str()) {
