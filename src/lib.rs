@@ -1,4 +1,6 @@
 mod metrics;
+#[cfg(feature = "prometheus")]
+pub mod prometheus;
 mod registry;
 
 /// Export metrics types

@@ -5,6 +5,7 @@ use crate::DEFAULT_SEPARATOR;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+use std::iter::once;
 use syn::{Data, DeriveInput, Error, Result, Type};
 
 #[derive(Default, Debug)]
@@ -22,6 +23,20 @@ impl MetricTree {
                 .required_scopes
                 .iter()
                 .all(|name| self.scopes.contains_key(name))
+    }
+
+    pub fn generate(&self) -> proc_macro2::TokenStream {
+        let root = self.generate_root();
+        let catalogue = self.generate_catalogue();
+        let scopes = self
+            .scopes
+            .values()
+            .map(|scope| scope.generate(&self.key_separator));
+        let combined = once(root).chain(once(catalogue)).chain(scopes);
+
+        quote! {
+            #(#combined)*
+        }
     }
 
     fn generate_root(&self) -> proc_macro2::TokenStream {
@@ -63,22 +78,6 @@ impl MetricTree {
 
         quote! {
             #recorder
-        }
-    }
-
-    pub fn generate(&self) -> proc_macro2::TokenStream {
-        let root = self.generate_root();
-        let catalogue = self.generate_catalogue();
-        let scopes = self
-            .scopes
-            .values()
-            .map(|scope| scope.generate(&self.key_separator));
-        let combined = std::iter::once(root)
-            .chain(std::iter::once(catalogue))
-            .chain(scopes);
-
-        quote! {
-            #(#combined)*
         }
     }
 
