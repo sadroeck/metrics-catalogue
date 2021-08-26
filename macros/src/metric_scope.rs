@@ -45,7 +45,7 @@ impl MetricScope {
 
         quote! {
             impl #struct_name {
-                const fn new() -> Self {
+                pub const fn new() -> Self {
                     Self {
                         #(#inits),*
                     }
