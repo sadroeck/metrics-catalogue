@@ -6,11 +6,11 @@ mod utils;
 
 const QUANTILES: [f64; 4] = [0.0, 0.5, 0.9, 0.99];
 
-pub trait Render {
+pub trait StringRender {
     fn render(&self, name: &str, s: &mut String);
 }
 
-impl Render for Counter {
+impl StringRender for Counter {
     fn render(&self, name: &str, s: &mut String) {
         // TODO: Process description
         // if let Some(desc) = descriptions.get(name.as_str()) {
@@ -39,13 +39,15 @@ fn render_gauge<G: GaugeMetric>(g: &G, name: &str, s: &mut String) {
     s.push('\n');
 }
 
-impl Render for Gauge {
+impl StringRender for Gauge {
+    #[inline]
     fn render(&self, name: &str, s: &mut String) {
         render_gauge(self, name, s)
     }
 }
 
-impl Render for DiscreteGauge {
+impl StringRender for DiscreteGauge {
+    #[inline]
     fn render(&self, name: &str, s: &mut String) {
         render_gauge(self, name, s)
     }
@@ -79,7 +81,8 @@ fn render_histogram<H: HistogramMetric>(h: &H, name: &str, s: &mut String) {
     s.push('\n');
 }
 
-impl<const RETENTION: u64> Render for Histogram<RETENTION> {
+impl<const RETENTION: u64> StringRender for Histogram<RETENTION> {
+    #[inline]
     fn render(&self, name: &str, s: &mut String) {
         render_histogram(self, name, s)
     }
