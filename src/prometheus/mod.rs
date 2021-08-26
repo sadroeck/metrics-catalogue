@@ -1,6 +1,7 @@
-use crate::prometheus::utils::{write_metric_line, write_type_line};
+use crate::prometheus::utils::{write_metric_line, write_type_line, Label};
 use crate::{Counter, DiscreteGauge, Gauge, GaugeMetric, Histogram, HistogramMetric};
 use metrics_util::Summary;
+use std::iter::{empty, once};
 
 mod utils;
 
@@ -19,8 +20,8 @@ impl StringRender for Counter {
         write_type_line(s, name, "counter");
 
         // TODO: process labels
-        let labels = &[];
-        write_metric_line::<&str, u64>(s, name, None, labels, None, self.read());
+        let labels = empty();
+        write_metric_line::<&str, u64, _>(s, name, None, labels, self.read());
         s.push('\n');
     }
 }
@@ -34,8 +35,8 @@ fn render_gauge<G: GaugeMetric>(g: &G, name: &str, s: &mut String) {
 
     write_type_line(s, name, "gauge");
     // TODO: process labels
-    let labels = [];
-    write_metric_line::<&str, f64>(s, name, None, &labels, None, g.read());
+    let labels = empty();
+    write_metric_line::<&str, f64, _>(s, name, None, labels, g.read());
     s.push('\n');
 }
 
@@ -62,7 +63,7 @@ fn render_histogram<H: HistogramMetric>(h: &H, name: &str, s: &mut String) {
 
     write_type_line(s, name, "histogram");
     // TODO: process labels
-    let labels = [];
+    let labels = empty();
     let mut summary = Summary::with_defaults();
     let samples = h.read();
     let mut sum = 0.0;
@@ -73,10 +74,22 @@ fn render_histogram<H: HistogramMetric>(h: &H, name: &str, s: &mut String) {
     }
     for q in QUANTILES {
         let value = summary.quantile(q).unwrap_or(0.0);
-        write_metric_line(s, &name, None, &labels, Some(("quantile", q)), value);
+        write_metric_line(
+            s,
+            &name,
+            None,
+            labels.clone().chain(once(Label::KeyValue(("quantile", q)))),
+            value,
+        );
     }
-    write_metric_line::<&str, f64>(s, &name, Some("sum"), &labels, None, sum);
-    write_metric_line::<&str, u64>(s, &name, Some("count"), &labels, None, count as u64);
+    write_metric_line(s, &name, Some("sum"), empty::<Label<usize>>(), sum);
+    write_metric_line(
+        s,
+        &name,
+        Some("count"),
+        empty::<Label<usize>>(),
+        count as u64,
+    );
 
     s.push('\n');
 }
