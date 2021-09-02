@@ -2,6 +2,7 @@ use crate::ast::{Attributes, Struct, TypePath};
 use crate::metric_scope::{MetricInstance, MetricScope, MetricType, SubMetric};
 use crate::scoped_catalogue::ScopedCatalogue;
 use crate::DEFAULT_SEPARATOR;
+use inflector::Inflector;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -28,10 +29,11 @@ impl MetricTree {
     pub fn generate(&self) -> proc_macro2::TokenStream {
         let root = self.generate_root();
         let catalogue = self.generate_catalogue();
+        let root_name = self.root_scope.as_ref().expect("No root scope");
         let scopes = self
             .scopes
             .values()
-            .map(|scope| scope.generate(&self.key_separator));
+            .map(|scope| scope.generate(&self.key_separator, scope.struct_name == *root_name));
         let combined = once(root).chain(once(catalogue)).chain(scopes);
 
         quote! {
@@ -102,8 +104,25 @@ impl MetricTree {
 
     fn generate_catalogue(&self) -> proc_macro2::TokenStream {
         let root_struct = self.root_scope.clone().expect("No root struct");
-        self.generate_scoped_catalogue("catalogue", &root_struct)
-            .generate_namespaced_keys(&self.key_separator)
+        let root_scope = self.scopes.get(&root_struct).expect("No root scope");
+        let root_mod = root_scope
+            .name_override
+            .as_ref()
+            .unwrap_or(&root_struct)
+            .to_snake_case();
+        let prefix = if root_mod.is_empty() {
+            String::new()
+        } else {
+            format!("{}{}", root_mod, self.key_separator)
+        };
+        let root_mod = if root_mod.is_empty() {
+            root_struct.to_snake_case()
+        } else {
+            root_mod
+        };
+
+        self.generate_scoped_catalogue(&root_mod, &root_struct)
+            .generate_prefix_keys(&prefix, &self.key_separator)
     }
 
     pub fn parse_struct(&mut self, input: DeriveInput) -> Result<()> {
@@ -125,6 +144,7 @@ impl MetricTree {
             ));
         }
 
+        let mut name_override = None;
         if let Attributes::Root(root) = &struct_data.attributes {
             self.root_scope.get_or_insert(struct_data.ident.to_string());
             self.key_separator = root
@@ -132,6 +152,7 @@ impl MetricTree {
                 .as_deref()
                 .unwrap_or(DEFAULT_SEPARATOR)
                 .to_string();
+            name_override = root.name_override.clone();
         }
 
         let mut metrics = vec![];
@@ -215,6 +236,7 @@ impl MetricTree {
         }
         let scope = MetricScope {
             struct_name: struct_data.ident.to_string(),
+            name_override,
             metrics,
             sub_metrics,
             other_fields,

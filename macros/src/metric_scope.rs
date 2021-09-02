@@ -1,4 +1,5 @@
 use crate::ast::TypePath;
+use inflector::Inflector;
 use proc_macro2::Ident;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
@@ -9,15 +10,16 @@ use syn::{Error, Path, Result};
 #[derive(Debug)]
 pub struct MetricScope {
     pub struct_name: String,
+    pub name_override: Option<String>,
     pub metrics: Vec<MetricInstance>,
     pub sub_metrics: HashMap<String, SubMetric>,
     pub other_fields: HashMap<String, String>,
 }
 
 impl MetricScope {
-    pub fn generate(&self, key_separator: &str) -> proc_macro2::TokenStream {
+    pub fn generate(&self, key_separator: &str, is_root: bool) -> proc_macro2::TokenStream {
         let initialize = self.generate_init();
-        let registry_trait = self.generate_registry_trait(key_separator);
+        let registry_trait = self.generate_registry_trait(key_separator, is_root);
         #[cfg(feature = "prometheus")]
         let prometheus = self.generate_prometheus(key_separator);
         #[cfg(not(feature = "prometheus"))]
@@ -54,7 +56,11 @@ impl MetricScope {
         }
     }
 
-    fn generate_registry_trait(&self, key_separator: &str) -> proc_macro2::TokenStream {
+    fn generate_registry_trait(
+        &self,
+        key_separator: &str,
+        is_root: bool,
+    ) -> proc_macro2::TokenStream {
         let struct_name = format_ident!("{}", &self.struct_name);
         let counters = match_metric_names(&self.metrics, &[MetricType::Counter], None);
         let sub_counters = self
@@ -92,27 +98,56 @@ impl MetricScope {
             quote! { .or_else(|| name.strip_prefix(#prefix).and_then(|n| ::metrics_catalogue::Registry::find_histogram(&self.#sub, n))) }
         });
 
+        let with_strip_prefix = |segment| {
+            if is_root
+                && self
+                    .name_override
+                    .as_ref()
+                    .map(|x| !x.is_empty())
+                    .unwrap_or(true)
+            {
+                let prefix = format!("{}{}", self.struct_name.to_snake_case(), key_separator);
+                quote! {
+                    name.strip_prefix(#prefix).and_then(|name| {
+                        #segment
+                    })
+                }
+            } else {
+                segment
+            }
+        };
+
+        let find_counter = with_strip_prefix(quote! {
+            match name {
+                #(#counters),*
+            }
+            #(#sub_counters)*
+        });
+        let find_gauge = with_strip_prefix(quote! {
+            match name {
+                #(#gauges),*
+            }
+            #(#sub_gauges)*
+        });
+        let find_histogram = with_strip_prefix(quote! {
+            match name {
+                #(#histograms),*
+            }
+            #(#sub_histograms)*
+        });
+
         quote! {
             impl ::metrics_catalogue::Registry for #struct_name {
                 fn find_counter(&self, name: &str) -> Option<&::metrics_catalogue::Counter> {
-                    match name {
-                        #(#counters),*
-                    }
-                    #(#sub_counters)*
+                    #find_counter
                 }
 
                 fn find_gauge(&self, name: &str) -> Option<&dyn ::metrics_catalogue::GaugeMetric> {
-                    match name {
-                        #(#gauges),*
-                    }
-                    #(#sub_gauges)*
+                    #find_gauge
                 }
 
                 fn find_histogram(&self, name: &str) -> Option<&dyn ::metrics_catalogue::HistogramMetric> {
-                    match name {
-                        #(#histograms),*
-                    }
-                    #(#sub_histograms)*
+                    #find_histogram
                 }
             }
         }

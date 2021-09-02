@@ -14,5 +14,8 @@ pub struct CustomSeparatorBar {
 #[test]
 fn custom_separator() {
     let _ = CustomSeparatorFoo::new();
-    assert_eq!(catalogue::bar::COUNTER, "bar-counter");
+    assert_eq!(
+        custom_separator_foo::bar::COUNTER,
+        "custom_separator_foo-bar-counter"
+    );
 }

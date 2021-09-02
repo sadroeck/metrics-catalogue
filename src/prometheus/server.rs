@@ -29,6 +29,7 @@ impl Server {
 
     pub fn run(
         self,
+        root_name: &'static str,
         renderer: impl StringRender + Send + Sync + Clone + 'static,
     ) -> Result<ServerFuture, Error> {
         let server = HyperServer::try_bind(&self.listen_address)?;
@@ -38,7 +39,7 @@ impl Server {
                 async move {
                     Ok::<_, Error>(service_fn(move |_| {
                         let mut output = String::new();
-                        renderer.render("", "", &mut output);
+                        renderer.render(root_name, "", &mut output);
                         async move { Ok::<_, Error>(Response::new(Body::from(output))) }
                     }))
                 }

@@ -46,34 +46,34 @@ struct SubSubTest {
 #[test]
 fn key_generation() {
     let known_names = [
-        (catalogue::MY_B, "my_b"),
-        (catalogue::MY_G, "my_g"),
-        (catalogue::MY_H_60, "my_h_60"),
-        (catalogue::MY_COUNTER_A, "my_counter_a"),
-        (catalogue::my_test::MY_T_A, "my_test.my_t_a"),
-        (catalogue::my_test::MY_T_B, "my_test.my_t_b"),
-        (catalogue::my_test::MY_T_H, "my_test.my_t_h"),
+        (test::MY_B, "test.my_b"),
+        (test::MY_G, "test.my_g"),
+        (test::MY_H_60, "test.my_h_60"),
+        (test::MY_COUNTER_A, "test.my_counter_a"),
+        (test::my_test::MY_T_A, "test.my_test.my_t_a"),
+        (test::my_test::MY_T_B, "test.my_test.my_t_b"),
+        (test::my_test::MY_T_H, "test.my_test.my_t_h"),
         (
-            catalogue::my_test::my_sub_sub::MY_S_T_A,
-            "my_test.my_sub_sub.my_s_t_a",
+            test::my_test::my_sub_sub::MY_S_T_A,
+            "test.my_test.my_sub_sub.my_s_t_a",
         ),
         (
-            catalogue::my_test::my_sub_sub::MY_S_T_B,
-            "my_test.my_sub_sub.my_s_t_b",
+            test::my_test::my_sub_sub::MY_S_T_B,
+            "test.my_test.my_sub_sub.my_s_t_b",
         ),
-        (catalogue::my_second_test::MY_T_A, "my_second_test.my_t_a"),
-        (catalogue::my_second_test::MY_T_B, "my_second_test.my_t_b"),
-        (catalogue::my_second_test::MY_T_H, "my_second_test.my_t_h"),
+        (test::my_second_test::MY_T_A, "test.my_second_test.my_t_a"),
+        (test::my_second_test::MY_T_B, "test.my_second_test.my_t_b"),
+        (test::my_second_test::MY_T_H, "test.my_second_test.my_t_h"),
         (
-            catalogue::my_second_test::my_sub_sub::MY_S_T_A,
-            "my_second_test.my_sub_sub.my_s_t_a",
+            test::my_second_test::my_sub_sub::MY_S_T_A,
+            "test.my_second_test.my_sub_sub.my_s_t_a",
         ),
         (
-            catalogue::my_second_test::my_sub_sub::MY_S_T_B,
-            "my_second_test.my_sub_sub.my_s_t_b",
+            test::my_second_test::my_sub_sub::MY_S_T_B,
+            "test.my_second_test.my_sub_sub.my_s_t_b",
         ),
-        (catalogue::MY_FULL_COUNTER, "my_full_counter"),
-        (catalogue::MY_H_30, "my_h_30"),
+        (test::MY_FULL_COUNTER, "test.my_full_counter"),
+        (test::MY_H_30, "test.my_h_30"),
     ];
     known_names.iter().for_each(|(k, v)| assert_eq!(k, v));
 }
@@ -82,16 +82,16 @@ fn key_generation() {
 fn counters() {
     let t = Test::new();
     let registered_counters = [
-        (catalogue::MY_B, &t.my_b),
-        (catalogue::MY_COUNTER_A, &t.my_a),
-        (catalogue::my_test::MY_T_B, &t.my_test.my_t_b),
+        (test::MY_B, &t.my_b),
+        (test::MY_COUNTER_A, &t.my_a),
+        (test::my_test::MY_T_B, &t.my_test.my_t_b),
         (
-            catalogue::my_test::my_sub_sub::MY_S_T_B,
+            test::my_test::my_sub_sub::MY_S_T_B,
             &t.my_test.my_sub_sub.my_s_t_b,
         ),
-        (catalogue::my_second_test::MY_T_B, &t.my_second_test.my_t_b),
+        (test::my_second_test::MY_T_B, &t.my_second_test.my_t_b),
         (
-            catalogue::my_second_test::my_sub_sub::MY_S_T_B,
+            test::my_second_test::my_sub_sub::MY_S_T_B,
             &t.my_second_test.my_sub_sub.my_s_t_b,
         ),
     ];
@@ -111,10 +111,10 @@ fn counters() {
 fn hidden_counters() {
     let t = Test::new();
     let hidden_counters = [
-        ("my_non_g", &t._my_non_g),
-        ("my_hidden_sub.my_b", &t._my_hidden_sub.my_t_b),
+        ("test.my_non_g", &t._my_non_g),
+        ("test.my_hidden_sub.my_b", &t._my_hidden_sub.my_t_b),
         (
-            "my_hidden_sub.my_sub_sub.my_s_t_b",
+            "test.my_hidden_sub.my_sub_sub.my_s_t_b",
             &t._my_hidden_sub.my_sub_sub.my_s_t_b,
         ),
     ];
@@ -129,14 +129,14 @@ fn hidden_counters() {
 fn histograms() {
     let t = Test::new();
     let registered_histograms = [
-        (catalogue::MY_H_60, &t.my_h_60 as &dyn HistogramMetric),
-        (catalogue::MY_H_30, &t.my_h_30 as &dyn HistogramMetric),
+        (test::MY_H_60, &t.my_h_60 as &dyn HistogramMetric),
+        (test::MY_H_30, &t.my_h_30 as &dyn HistogramMetric),
         (
-            catalogue::my_test::MY_T_H,
+            test::my_test::MY_T_H,
             &t.my_test.my_t_h as &dyn HistogramMetric,
         ),
         (
-            catalogue::my_second_test::MY_T_H,
+            test::my_second_test::MY_T_H,
             &t.my_second_test.my_t_h as &dyn HistogramMetric,
         ),
     ];
