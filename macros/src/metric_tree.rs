@@ -107,7 +107,7 @@ impl MetricTree {
         let root_mod = root_struct.to_snake_case();
         let prefix = format!("{}{}", root_mod, self.key_separator);
 
-        self.generate_scoped_catalogue("catalogue", &root_struct)
+        self.generate_scoped_catalogue(&root_mod, &root_struct)
             .generate_prefix_keys(&prefix, &self.key_separator)
     }
 
