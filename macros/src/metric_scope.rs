@@ -10,6 +10,7 @@ use syn::{Error, Path, Result};
 #[derive(Debug)]
 pub struct MetricScope {
     pub struct_name: String,
+    pub name_override: Option<String>,
     pub metrics: Vec<MetricInstance>,
     pub sub_metrics: HashMap<String, SubMetric>,
     pub other_fields: HashMap<String, String>,
@@ -98,7 +99,13 @@ impl MetricScope {
         });
 
         let with_strip_prefix = |segment| {
-            if is_root {
+            if is_root
+                && self
+                    .name_override
+                    .as_ref()
+                    .map(|x| !x.is_empty())
+                    .unwrap_or(true)
+            {
                 let prefix = format!("{}{}", self.struct_name.to_snake_case(), key_separator);
                 quote! {
                     name.strip_prefix(#prefix).and_then(|name| {
