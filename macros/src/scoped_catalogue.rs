@@ -9,7 +9,7 @@ pub struct ScopedCatalogue {
 }
 
 impl ScopedCatalogue {
-    fn generate_prefix_keys(&self, prefix: &str, separator: &str) -> TokenStream {
+    pub fn generate_prefix_keys(&self, prefix: &str, separator: &str) -> TokenStream {
         let metric_keys = self.metrics.iter().map(|(k, v)| {
             let key = format_ident!("{}", k);
             let name = format!("{}{}", prefix, v);
@@ -28,9 +28,5 @@ impl ScopedCatalogue {
                 #(#keys)*
             }
         }
-    }
-
-    pub fn generate_namespaced_keys(&self, separator: &str) -> TokenStream {
-        self.generate_prefix_keys("", separator)
     }
 }

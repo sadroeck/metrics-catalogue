@@ -2,6 +2,7 @@ use crate::ast::{Attributes, Struct, TypePath};
 use crate::metric_scope::{MetricInstance, MetricScope, MetricType, SubMetric};
 use crate::scoped_catalogue::ScopedCatalogue;
 use crate::DEFAULT_SEPARATOR;
+use inflector::Inflector;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -28,10 +29,11 @@ impl MetricTree {
     pub fn generate(&self) -> proc_macro2::TokenStream {
         let root = self.generate_root();
         let catalogue = self.generate_catalogue();
+        let root_name = self.root_scope.as_ref().expect("No root scope");
         let scopes = self
             .scopes
             .values()
-            .map(|scope| scope.generate(&self.key_separator));
+            .map(|scope| scope.generate(&self.key_separator, scope.struct_name == *root_name));
         let combined = once(root).chain(once(catalogue)).chain(scopes);
 
         quote! {
@@ -102,8 +104,11 @@ impl MetricTree {
 
     fn generate_catalogue(&self) -> proc_macro2::TokenStream {
         let root_struct = self.root_scope.clone().expect("No root struct");
+        let root_mod = root_struct.to_snake_case();
+        let prefix = format!("{}{}", root_mod, self.key_separator);
+
         self.generate_scoped_catalogue("catalogue", &root_struct)
-            .generate_namespaced_keys(&self.key_separator)
+            .generate_prefix_keys(&prefix, &self.key_separator)
     }
 
     pub fn parse_struct(&mut self, input: DeriveInput) -> Result<()> {

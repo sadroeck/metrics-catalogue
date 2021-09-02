@@ -27,7 +27,7 @@ impl<'a> Field<'a> {
 
     pub fn get_metric(&self) -> Option<String> {
         match &self.attributes {
-            Attributes::Root(_) => None,
+            Attributes::Root(root) => root.name_override.clone(),
             Attributes::Struct(StructAttributes {
                 hidden,
                 name_override,
@@ -72,6 +72,7 @@ pub enum Attributes {
 #[derive(Default, Debug)]
 pub struct RootAttributes {
     pub separator: Option<String>,
+    pub name_override: Option<String>,
 }
 
 #[derive(Default, Debug)]
@@ -119,6 +120,9 @@ impl Attributes {
                                         NestedMeta::Lit(lit) => {
                                             if let Lit::Str(name) = lit {
                                                 attributes.name_override = Some(name.value());
+                                                if let Some(root) = &mut root {
+                                                    root.name_override = Some(name.value());
+                                                }
                                             }
                                         }
                                     }
