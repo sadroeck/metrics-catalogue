@@ -106,7 +106,15 @@ impl MetricScope {
                     .map(|x| !x.is_empty())
                     .unwrap_or(true)
             {
-                let prefix = format!("{}{}", self.struct_name.to_snake_case(), key_separator);
+                let prefix = format!(
+                    "{}{}",
+                    if is_root {
+                        self.mod_name()
+                    } else {
+                        self.struct_name.clone()
+                    },
+                    key_separator
+                );
                 quote! {
                     name.strip_prefix(#prefix).and_then(|name| {
                         #segment
@@ -210,6 +218,11 @@ impl MetricScope {
                 }
             }
         }
+    }
+
+    fn mod_name(&self) -> String {
+        let s = self.name_override.as_ref().unwrap_or(&self.struct_name);
+        if s.is_empty() { &self.struct_name } else { s }.to_snake_case()
     }
 }
 
