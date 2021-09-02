@@ -52,24 +52,24 @@ fn prometheus_render() {
         .collect::<Vec<_>>();
 
     // Metric types
-    assert_type_in_output(&lines, "my_b", "counter");
-    assert_type_in_output(&lines, "my_g", "gauge");
-    assert_type_in_output(&lines, "my_discrete_g", "gauge");
-    assert_type_in_output(&lines, "my_h_60", "histogram");
+    assert_type_in_output(&lines, "test.my_b", "counter");
+    assert_type_in_output(&lines, "test.my_g", "gauge");
+    assert_type_in_output(&lines, "test.my_discrete_g", "gauge");
+    assert_type_in_output(&lines, "test.my_h_60", "histogram");
 
     // Metric values
-    assert_value_in_output(&lines, "my_b");
-    assert_value_in_output(&lines, "my_g");
-    assert_quantile_in_output(&lines, "my_h_60");
+    assert_value_in_output(&lines, "test.my_b");
+    assert_value_in_output(&lines, "test.my_g");
+    assert_quantile_in_output(&lines, "test.my_h_60");
 
     // Hidden metrics
-    assert!(lines.iter().all(|l| !l.contains("_my_non_g")));
-    assert!(lines.iter().all(|l| !l.contains("_my_hidden_sub")));
+    assert!(lines.iter().all(|l| !l.contains("test._my_non_g")));
+    assert!(lines.iter().all(|l| !l.contains("test._my_hidden_sub")));
 
     // Sub metrics
-    assert_type_in_output(&lines, "my_test.my_t_a", "gauge");
-    assert_type_in_output(&lines, "my_test.my_t_b", "counter");
-    assert_type_in_output(&lines, "my_test.my_t_h", "histogram");
+    assert_type_in_output(&lines, "test.my_test.my_t_a", "gauge");
+    assert_type_in_output(&lines, "test.my_test.my_t_b", "counter");
+    assert_type_in_output(&lines, "test.my_test.my_t_h", "histogram");
 }
 
 #[cfg(feature = "prometheus")]
@@ -77,12 +77,7 @@ mod utils {
     #[inline]
     pub fn assert_type_in_output(lines: &[&str], name: &str, expected_type: &str) {
         let s = format!("TYPE {} {}", name, expected_type);
-        assert!(
-            lines.iter().any(|l| s == *l),
-            "No {} {} in output",
-            expected_type,
-            name,
-        );
+        assert!(lines.iter().any(|l| s == *l), "No {} {} in output", expected_type, name,);
     }
 
     #[inline]

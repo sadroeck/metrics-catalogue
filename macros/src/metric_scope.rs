@@ -21,7 +21,7 @@ impl MetricScope {
         let initialize = self.generate_init();
         let registry_trait = self.generate_registry_trait(key_separator, is_root);
         #[cfg(feature = "prometheus")]
-        let prometheus = self.generate_prometheus(key_separator);
+        let prometheus = self.generate_prometheus(key_separator, is_root);
         #[cfg(not(feature = "prometheus"))]
         let prometheus = quote! {};
 
@@ -154,14 +154,25 @@ impl MetricScope {
     }
 
     #[cfg(feature = "prometheus")]
-    fn generate_prometheus(&self, key_separator: &str) -> proc_macro2::TokenStream {
+    fn generate_prometheus(&self, key_separator: &str, is_root: bool) -> proc_macro2::TokenStream {
         let struct_name = format_ident!("{}", &self.struct_name);
         let needs_new_prefix = self.metrics.iter().filter(|m| !m.hidden).count()
             + self.sub_metrics.iter().filter(|(_, m)| !m.hidden).count()
             > 0;
-        let new_prefix = if needs_new_prefix {
+        let new_prefix = if is_root {
+            let s = self.name_override.as_ref().unwrap_or(&self.struct_name);
+            let root_prefix = format!(
+                "{}{}",
+                if s.is_empty() { &self.struct_name } else { s }.to_snake_case(),
+                key_separator
+            );
+            quote! {
+                let prefix = #root_prefix;
+            }
+        } else if needs_new_prefix {
             let formatter = format!("{{}}{{}}{}", key_separator);
             let name_formatter = format!("{{}}{}", key_separator);
+
             quote! {
                 let prefix = if !prefix.is_empty() {
                     std::borrow::Cow::Owned(format!(#formatter, prefix, name))
